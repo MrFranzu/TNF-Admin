@@ -1,0 +1,65 @@
+/* App.css */
+
+body {
+  font-family: 'Arial', sans-serif;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(to right, #ffe6f2, #ffe6cc); /* Light pink to light orange */
+  display: flex;
+  justify-content: center; /* Center content horizontally */
+  align-items: center; /* Center content vertically */
+  height: 100vh; /* Full viewport height */
+}
+
+.container {
+  display: flex;
+  width: 100%; /* Full width */
+  max-width: 1200px; /* Max width for larger screens */
+  margin: 0 auto; /* Center the container */
+  padding: 20px;
+  background-color: transparent; /* Keep transparent background */
+}
+
+.grid {
+  width: 100%; /* Full width for grid */
+}
+
+.grid-item {
+  background: #ffccff; /* Light pink background for grid items */
+  padding: 20px;
+  text-align: center; /* Center text */
+  margin: 10px; /* Space around grid items */
+}
+
+.grid-item:hover {
+  transform: scale(1.05); /* Slight scale on hover */
+}
+
+.login-form {
+  display: flex;
+  justify-content: center; /* Center login form */
+  align-items: center; /* Center vertically */
+  flex-direction: column; /* Stack items vertically */
+  width: 100%; /* Full width */
+  padding: 20px;
+}
+
+h3 {
+  color: #ff6699; /* Title color */
+  margin-bottom: 10px; /* Space below title */
+}
+
+p {
+  color: #333; /* Text color */
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .container {
+    padding: 10px; /* Less padding on mobile */
+  }
+
+  .grid-item {
+    padding: 15px; /* Less padding for grid items on mobile */
+  }
+}
