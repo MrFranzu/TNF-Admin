@@ -27,8 +27,7 @@ const App = () => {
             element={
               isLoggedIn ? (
                 <div>
-                  <h3>Welcome to the Dashboard</h3>
-                  <p>Here you can manage your events.</p>
+             
                   <EventAnalytics /> {/* Added EventAnalytics here */}
                 </div>
               ) : (
