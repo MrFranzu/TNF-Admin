@@ -22,7 +22,6 @@ const movingAverage = (data, windowSize) => {
 // Helper function to group events by time (for trend analysis)
 const groupByTimeSlot = (events) => {
   const grouped = {};
-
   events.forEach(event => {
     const timeSlot = event.Time.split(' - ')[0]; // Get the start time (e.g., "2:00 pm")
     if (!grouped[timeSlot]) {
@@ -30,7 +29,6 @@ const groupByTimeSlot = (events) => {
     }
     grouped[timeSlot] += 1; // Count number of bookings per time slot
   });
-
   return grouped;
 };
 
@@ -42,12 +40,10 @@ const predictResources = (event) => {
     staff: Math.ceil((parseInt(event["No. of persons"], 10) || 0) / 10), // 1 staff per 10 people
   };
 
-  // Customize catering based on the event type (e.g., "Wedding" for more servings)
   if (event["Event/Occasion"] === "Wedding") {
     resources.catering = (parseInt(event["No. of persons"], 10) || 0) * 3; // Wedding catering is 3 dishes per person
   }
 
-  // Adjust based on the menu type (e.g., "Plated" or "Buffet")
   if (event["Package"].includes("Buffet")) {
     resources.catering = (parseInt(event["No. of persons"], 10) || 0) * 4; // Buffet events may need more servings
   }
@@ -62,30 +58,33 @@ const predictBookingTrend = (events) => {
 
   const predictions = {};
   timeSlots.forEach(time => {
-    const hour = time.getHours();
-    const timeSlot = `${hour}:00`;
-    if (!predictions[timeSlot]) predictions[timeSlot] = 0;
-    predictions[timeSlot] += 1; // Count number of bookings per hour
+    const year = time.getFullYear();
+    if (!predictions[year]) predictions[year] = 0;
+    predictions[year] += 1; // Count number of bookings per year
   });
 
-  const timeSlotArray = Object.entries(predictions).map(([key, value]) => value);
-  const predictedBookings = movingAverage(timeSlotArray, 3); // Moving average with window size of 3 for trend smoothing
+  const yearArray = Object.entries(predictions).map(([key, value]) => value);
+  const predictedBookings = movingAverage(yearArray, 3); // Moving average with window size of 3 for trend smoothing
 
   return Object.keys(predictions).map((key, index) => ({
-    timeSlot: key,
+    year: key,
     predictedBookings: predictedBookings[index]
   }));
 };
 
-// Predict check-in patterns based on the event time (can be enhanced with QR scan data)
+// Predict check-in patterns based on the event time
 const predictCheckInPatterns = (events) => {
   const checkInTimes = events.map(event => new Date(event["Check-in Time"])); // Assuming "Check-in Time" exists
   const checkInGroups = {};
 
   checkInTimes.forEach(time => {
-    const hour = time.getHours();
-    if (!checkInGroups[hour]) checkInGroups[hour] = 0;
-    checkInGroups[hour] += 1; // Count check-ins per hour
+    const hour = time.getHours(); // Extract the hour (0-23)
+    const hourLabel = `${hour}:00`; // Format as "hour:00" (e.g., "14:00")
+
+    if (!checkInGroups[hourLabel]) {
+      checkInGroups[hourLabel] = 0;
+    }
+    checkInGroups[hourLabel] += 1; // Count check-ins per hour
   });
 
   const checkInArray = Object.entries(checkInGroups).map(([key, value]) => value);
@@ -113,22 +112,13 @@ const EventAnalytics = () => {
         const snapshot = await getDocs(eventCollection);
         const eventData = snapshot.docs.map(doc => {
           const event = doc.data();
-
-          // Validate and parse Date
           if (!event.Date) return null;
           const date = new Date(event.Date);
           if (isNaN(date)) return null;  // Skip invalid date
           event.Date = date.getTime();  // Store as timestamp
-
-          // Validate and parse "No. of persons"
           event["No. of persons"] = parseInt(event["No. of persons"], 10) || 0;
-
-          // Validate "Full Payment"
           event["Full Payment"] = event["Full Payment"] ? parseFloat(event["Full Payment"].replace(/,/g, '')) : 0;
-
-          // Check for "Check-in Time"
           event["Check-in Time"] = event["Check-in Time"] ? new Date(event["Check-in Time"]) : null;
-
           return event;
         }).filter(Boolean); // Remove invalid entries
 
@@ -152,7 +142,6 @@ const EventAnalytics = () => {
         // Predict check-in patterns using "Check-in Time"
         const checkInPredictions = predictCheckInPatterns(eventData);
         setCheckInPattern(checkInPredictions);
-
       } catch (error) {
         console.error('Error fetching events:', error);
       } finally {
@@ -163,16 +152,17 @@ const EventAnalytics = () => {
     fetchEvents();
   }, []);
 
-  // Check if data exists before rendering the charts
   const isDataAvailable = (data) => {
     return Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0;
   };
 
   const bookingChartData = {
-    labels: Object.keys(rawBookingTrend),
+    labels: Object.keys(rawBookingTrend).sort(), // Time slots on the X-axis
     datasets: [{
       label: 'Event Bookings by Time Slot',
-      data: Object.values(rawBookingTrend),
+      data: Object.keys(rawBookingTrend)
+        .sort()
+        .map(timeSlot => rawBookingTrend[timeSlot]),
       fill: false,
       borderColor: 'rgb(75, 192, 192)',
       tension: 0.1
@@ -180,7 +170,10 @@ const EventAnalytics = () => {
   };
 
   const checkInChartData = {
-    labels: Object.keys(checkInPattern).map((key) => `${key}:00`),
+    labels: Object.keys(checkInPattern).map((key) => {
+      const time = new Date(key);
+      return time.toLocaleString('en-US', { hour: 'numeric', hour12: true });
+    }),
     datasets: [{
       label: 'Check-ins by Hour',
       data: Object.values(checkInPattern),
@@ -191,7 +184,7 @@ const EventAnalytics = () => {
   };
 
   const predictedBookingChartData = {
-    labels: predictedBookingTrend.map((entry) => entry.timeSlot),
+    labels: predictedBookingTrend.map((entry) => entry.year),
     datasets: [{
       label: 'Predicted Bookings',
       data: predictedBookingTrend.map((entry) => entry.predictedBookings),
@@ -224,36 +217,34 @@ const EventAnalytics = () => {
     }]
   };
 
-  const containerStyle = {
+  const cardStyle = {
+    backgroundColor: 'white', // Set the background color to white
+    border: '1px solid #ddd', // Light border color
+    borderRadius: '8px', // Rounded corners
+    padding: '20px', // Padding inside the card
+    margin: '20px', // Space around each card
+    boxShadow: '0 4px 8px rgba(0,0,0,0.1)', // Light shadow for depth
+    textAlign: 'center', // Center-align text
+    flex: '1 1 30%',  // Ensure the cards take up about 30% of the row
+    marginRight: '20px' // Right margin for spacing between cards
+  };
+  
+
+  const rowStyle = {
     display: 'flex',
     flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    marginTop: '20px',
-  };
-
-  const cardStyle = {
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    padding: '20px',
-    margin: '10px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    backgroundColor: '#fff',
-    flex: '1 1 45%',
-    minWidth: '300px',
+    justifyContent: 'space-between'
   };
 
   return (
     <div>
-      <h1>Event Analytics</h1>
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
-          <ThreeDots color="#00BFFF" height={100} width={100} />
-        </div>
+        <ThreeDots height="80" width="80" radius="9" color="green" ariaLabel="three-dots-loading" />
       ) : (
-        <div style={containerStyle}>
+        <div style={rowStyle}>
           {isDataAvailable(rawBookingTrend) && (
             <div style={cardStyle}>
-              <h3>Booking Trend by Time Slot</h3>
+              <h3>Booking Trend Analysis</h3>
               <Line data={bookingChartData} />
             </div>
           )}
@@ -267,14 +258,14 @@ const EventAnalytics = () => {
 
           {isDataAvailable(checkInPattern) && (
             <div style={cardStyle}>
-              <h3>Check-in Pattern</h3>
+              <h3>Check-in Patterns</h3>
               <Line data={checkInChartData} />
             </div>
           )}
 
           {isDataAvailable(resourceForecast) && (
             <div style={cardStyle}>
-              <h3>Resource Forecast (Seating, Catering, Staff)</h3>
+              <h3>Resource Forecast</h3>
               <Bar data={resourceForecastChartData} />
             </div>
           )}
