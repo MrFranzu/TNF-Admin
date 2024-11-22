@@ -10,7 +10,6 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import EventIcon from '@mui/icons-material/Event';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import LocalMallIcon from '@mui/icons-material/LocalMall';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import { useNavigate } from 'react-router-dom';
 import logo from './tnf.png';
@@ -76,11 +75,6 @@ const Sidebar = () => {
           icon={<AssessmentIcon />}
           text="Analytics"
           onClick={handleAnalysisClick} 
-        />
-        <ListItemLink
-          icon={<LocalMallIcon />}
-          text="Supplies"
-          onClick={() => {}}
         />
         <ListItemLink
           icon={<QrCodeIcon />}

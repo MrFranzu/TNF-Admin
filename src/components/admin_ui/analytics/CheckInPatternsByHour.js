@@ -125,27 +125,32 @@ const CheckInPatternsByHour = () => {
     return () => unsubscribe();
   }, []);
 
+  const peakCheckInTime = checkInPattern.reduce((prev, curr) => (prev.predictedCheckIns > curr.predictedCheckIns ? prev : curr), {});
+
+  // Predictive Insights
+  const increasingTrend = checkInPattern.slice(-3).every((item, idx, arr) => idx === 0 || item.predictedCheckIns > arr[idx - 1].predictedCheckIns);
+  const decreasingTrend = checkInPattern.slice(-3).every((item, idx, arr) => idx === 0 || item.predictedCheckIns < arr[idx - 1].predictedCheckIns);
+
   return (
     <div>
       {loading ? (
-        <div><ThreeDots color="gray" /></div>
+        <div style={{ textAlign: 'center' }}><ThreeDots color="gray" /></div>
       ) : error ? (
-        <div style={{ color: 'red' }}>{error}</div>
+        <div style={{ color: 'red', fontSize: '18px', fontWeight: 'bold' }}>{error}</div>
       ) : (
         <div>
-          <h3>Check-in Patterns by Hour</h3>
-          {/* Container div for chart */}
-          <div style={{ width: '1000px', height: '400px', margin: '0 auto' }}>
+          <h3 style={{ textAlign: 'center', fontSize: '24px', marginBottom: '20px' }}>Check-in Patterns by Hour</h3>
+          <div style={{ width: '1000px', height: '400px', margin: '0 auto', overflowY: 'auto' }}>
             <Line
               data={{
-                labels: checkInPattern.map(item => item.hour),  // Use the hour labels directly (now in 12-hour format)
+                labels: checkInPattern.map(item => item.hour),
                 datasets: [
                   {
                     label: 'Predicted Check-ins by Hour',
                     data: checkInPattern.map(item => item.predictedCheckIns),
                     borderColor: 'rgb(255, 159, 64)',
                     fill: false,
-                    tension: 0.1,  // Smooth lines
+                    tension: 0.1,
                   },
                 ],
               }}
@@ -155,9 +160,7 @@ const CheckInPatternsByHour = () => {
                 plugins: {
                   tooltip: {
                     callbacks: {
-                      label: (context) => {
-                        return `Predicted check-ins: ${context.raw}`;
-                      },
+                      label: (context) => `Predicted check-ins: ${context.raw}`,
                     },
                   },
                 },
@@ -166,17 +169,37 @@ const CheckInPatternsByHour = () => {
                     title: {
                       display: true,
                       text: 'Hour of the Day',
+                      font: { size: 16 },
                     },
                   },
                   y: {
                     title: {
                       display: true,
                       text: 'Number of Check-ins',
+                      font: { size: 16 },
                     },
                   },
                 },
               }}
             />
+          </div>
+
+          {/* Predictive Insights Section */}
+          <div style={{ marginTop: '20px', fontSize: '16px' }}>
+            <h4 style={{ fontSize: '20px', marginBottom: '10px' }}>Predicted Insights</h4>
+            <p>The predicted peak check-in time is at <strong>{peakCheckInTime.hour}</strong> with approximately <strong>{Math.round(peakCheckInTime.predictedCheckIns)}</strong> check-ins. This suggests that you can expect a higher number of attendees during this time.</p>
+            
+            {increasingTrend && (
+              <p>Recent check-ins show an increasing trend, indicating a potential rise in event attendance. It would be beneficial to ensure that sufficient resources (e.g., staff, facilities) are available to handle the increased flow during these peak hours.</p>
+            )}
+            {decreasingTrend && (
+              <p>Recent check-ins show a decreasing trend, suggesting that the flow of attendees may taper off soon. This could be an opportunity to reallocate resources to other areas of the event or prepare for wrap-up activities.</p>
+            )}
+            {!increasingTrend && !decreasingTrend && (
+              <p>The check-in pattern is currently stable, suggesting that attendance is consistent. Monitoring over time can help identify any shifts in behavior.</p>
+            )}
+
+            <p>Based on the current trends, it is advisable to focus resources around peak hours to ensure a smooth attendee experience. For future events, analyzing these patterns in real-time could help refine resource allocation strategies.</p>
           </div>
         </div>
       )}
