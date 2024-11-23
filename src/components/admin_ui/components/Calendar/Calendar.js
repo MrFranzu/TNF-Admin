@@ -97,7 +97,7 @@ const EventCalendar = () => {
           />
         </div>
         <div style={styles.eventsContainer}>
-          <h2 style={styles.eventsTitle}>Events on {date.toDateString()}:</h2>
+          <h2 style={styles.eventsTitle}>Event on {date.toDateString()}:</h2>
           {eventsForSelectedDate.length > 0 ? (
             <ul style={styles.eventsList}>
               {eventsForSelectedDate.map(event => (
