@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { FaDownload } from 'react-icons/fa';
 
@@ -72,6 +72,29 @@ const BookingList = () => {
     });
   };
 
+  const deleteBooking = async (bookingId) => {
+    try {
+      // Delete booking from Firestore
+      const bookingRef = doc(db, 'bookings', bookingId);
+      await deleteDoc(bookingRef);
+
+      // Update local state to remove the deleted booking
+      setBookings((prev) => {
+        const updatedState = {
+          pending: prev.pending.filter((b) => b.id !== bookingId),
+          ongoing: prev.ongoing.filter((b) => b.id !== bookingId),
+          done: prev.done.filter((b) => b.id !== bookingId),
+        };
+
+        syncWithStorage(updatedState);
+        return updatedState;
+      });
+    } catch (err) {
+      setError(`Failed to cancel booking: ${err.message}`);
+      console.error('Error deleting booking:', err);
+    }
+  };
+
   const downloadExcel = () => {
     const allBookings = [
       ...bookings.pending,
@@ -137,6 +160,8 @@ const BookingList = () => {
         borderRadius: '10px',
         padding: '15px',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        maxHeight: '400px', // Limit the height
+        overflowY: 'auto', // Add scroll bar when content overflows
       }}
     >
       <h2 style={{ textAlign: 'center', color: '#333', marginBottom: '15px' }}>{title}</h2>
@@ -173,6 +198,23 @@ const BookingList = () => {
                   {label}
                 </button>
               ))}
+              {/* Add the cancel button for pending bookings */}
+              {title === 'Pending' && (
+                <button
+                  onClick={() => deleteBooking(booking.id)}
+                  style={{
+                    backgroundColor: '#f44336', // Red button
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    marginTop: '10px',
+                  }}
+                >
+                  Cancel Booking
+                </button>
+              )}
             </div>
           </div>
         ))
@@ -220,10 +262,11 @@ const BookingList = () => {
             { label: 'Move to Done', state: 'done', color: '#4caf50' },
           ])}
           {renderBookings(bookings.ongoing, 'Ongoing', '#fff3e0', [
-            { label: 'Move to Pending', state: 'pending', color: '#ff7043' },
+            { label: 'Move to Pending', state: 'pending', color: '#1976d2' },
             { label: 'Move to Done', state: 'done', color: '#4caf50' },
           ])}
-          {renderBookings(bookings.done, 'Done', '#f1f8e9', [
+          {renderBookings(bookings.done, 'Done', '#e8f5e9', [
+            { label: 'Move to Pending', state: 'pending', color: '#1976d2' },
             { label: 'Move to Ongoing', state: 'ongoing', color: '#ff4081' },
           ])}
         </div>
