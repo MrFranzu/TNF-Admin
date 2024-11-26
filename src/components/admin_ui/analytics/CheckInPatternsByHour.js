@@ -140,7 +140,7 @@ const CheckInPatternsByHour = () => {
       ) : (
         <div>
           <h3 style={{ textAlign: 'center', fontSize: '24px', marginBottom: '20px' }}>Check-in Patterns by Hour</h3>
-          <div style={{ width: '1000px', height: '400px', margin: '0 auto', overflowY: 'auto' }}>
+          <div style={{ width: '1000px', height: '400px', margin: '0 auto', overflowY: 'auto', maxHeight: '400px' }}>
             <Line
               data={{
                 labels: checkInPattern.map(item => item.hour),
