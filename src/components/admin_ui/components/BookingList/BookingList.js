@@ -181,6 +181,8 @@ const BookingList = () => {
           >
             <strong>{booking.name || 'Unnamed Booking'}</strong>
             <div style={{ marginTop: '10px' }}>
+              {/* Show event date */}
+              <p><strong>Event Date:</strong> {formatTimestamp(booking.eventDate)}</p>
               {targetStates.map(({ label, state, color }) => (
                 <button
                   key={state}
@@ -262,11 +264,9 @@ const BookingList = () => {
             { label: 'Move to Done', state: 'done', color: '#4caf50' },
           ])}
           {renderBookings(bookings.ongoing, 'Ongoing', '#fff3e0', [
-            { label: 'Move to Pending', state: 'pending', color: '#1976d2' },
             { label: 'Move to Done', state: 'done', color: '#4caf50' },
           ])}
           {renderBookings(bookings.done, 'Done', '#e8f5e9', [
-            { label: 'Move to Pending', state: 'pending', color: '#1976d2' },
             { label: 'Move to Ongoing', state: 'ongoing', color: '#ff4081' },
           ])}
         </div>

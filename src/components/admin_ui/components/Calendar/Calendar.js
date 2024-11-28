@@ -11,6 +11,18 @@ const EventCalendar = () => {
   const [error, setError] = useState(null);
   const [date, setDate] = useState(new Date());
 
+  const formatTime = (time) => {
+    if (typeof time === 'string') {
+      const [hour, minute] = time.split(':').map(Number);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const formattedHour = hour % 12 || 12;
+      return `${formattedHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
+    }
+    return 'Invalid Time'; // Default fallback for invalid inputs
+  };
+  
+  
+
   const fetchBookings = async () => {
     try {
       const bookingsCollection = collection(db, 'bookings');
@@ -22,15 +34,45 @@ const EventCalendar = () => {
       return snapshot.docs.map(doc => {
         const data = doc.data();
         let eventDate = data.eventDate;
+        let startTime = data.startTime;
+        let endTime = data.endTime;
 
-        // Convert Firestore Timestamp to Date if it's an instance of Timestamp
+        // Convert eventDate if it's a Timestamp or string
         if (eventDate instanceof Timestamp) {
-          eventDate = eventDate.toDate();
+          eventDate = eventDate.toDate(); // Convert Firestore Timestamp to Date
         } else if (eventDate && typeof eventDate === 'string') {
-          eventDate = new Date(eventDate);
+          eventDate = new Date(eventDate); // Convert string to Date if it's a string
         }
 
-        return { id: doc.id, ...data, eventDate };
+        // Convert startTime and endTime from Timestamp or string to Date
+        if (startTime instanceof Timestamp) {
+          startTime = startTime.toDate(); // Convert Firestore Timestamp to Date
+        } if (typeof startTime === 'string') {
+          // Assume the string is already in "HH:mm" format
+        } else if (startTime instanceof Timestamp) {
+          startTime = startTime.toDate().toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+        } else {
+          startTime = 'Invalid Time'; // Handle missing or unexpected values
+        }
+        
+        if (typeof endTime === 'string') {
+          // Assume the string is already in "HH:mm" format
+        } else if (endTime instanceof Timestamp) {
+          endTime = endTime.toDate().toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+        } else {
+          endTime = 'Invalid Time'; // Handle missing or unexpected values
+        }
+        
+
+        return { id: doc.id, ...data, eventDate, startTime, endTime };
       });
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -45,6 +87,7 @@ const EventCalendar = () => {
       setError(null);
       try {
         const bookingsData = await fetchBookings();
+        console.log('Fetched Bookings:', bookingsData); // Log data to verify
         setBookings(bookingsData);
       } catch (err) {
         setError(err.message);
@@ -54,6 +97,7 @@ const EventCalendar = () => {
     };
     getBookings();
   }, []);
+  
 
   const handleDateChange = (newDate) => {
     setDate(new Date(newDate));
@@ -100,20 +144,38 @@ const EventCalendar = () => {
           <h2 style={styles.eventsTitle}>Event on {date.toDateString()}:</h2>
           {eventsForSelectedDate.length > 0 ? (
             <ul style={styles.eventsList}>
-              {eventsForSelectedDate.map(event => (
-                <li key={event.id} style={styles.eventItem}>
-                  <strong style={styles.eventName}>{event.name || 'Unnamed Event'}</strong>
-                  <p style={styles.eventDetails}>{event.eventType || 'Unnamed Type'} - <span style={styles.highlight}>{event.eventDate.toDateString()}</span></p>
-                  <p style={styles.eventContact}>Contact: <span style={styles.highlight}>{event.contactNumber || 'N/A'}</span></p>
-                  <p style={styles.eventEmail}>Email: <span style={styles.highlight}>{event.email || 'N/A'}</span></p>
-                  <p style={styles.eventPayment}>Payment Method: <span style={styles.highlight}>{event.paymentMethod || 'N/A'}</span></p>
-                  <p style={styles.eventAttendees}>Number of Attendees: <span style={styles.highlight}>{event.numAttendees || 'N/A'}</span></p>
-                  <p style={styles.eventScanned}>Scanned Count: <span style={styles.highlight}>{event.scannedCount || '0'}</span></p>
-                  {event.notes && <p style={styles.eventNotes}>Notes: <span style={styles.highlight}>{event.notes}</span></p>}
-                  {event.qrCode && <p style={styles.eventQr}>QR Code: <span style={styles.highlight}>{event.qrCode}</span></p>}
-                </li>
-              ))}
-            </ul>
+            {eventsForSelectedDate.map(event => (
+              <li key={event.id} style={styles.eventItem}>
+                <strong style={styles.eventName}>{event.name || 'Unnamed Event'}</strong>
+                <p style={styles.eventDetails}>
+                  {event.eventType || 'Unnamed Type'} - 
+                  <span style={styles.highlight}>
+                    {event.eventDate instanceof Date ? event.eventDate.toDateString() : 'N/A'}
+                  </span>
+                </p>
+                <p style={styles.eventTime}>
+                    Start Time: <span style={styles.highlight}>
+                      {event.startTime ? formatTime(event.startTime) : 'N/A'}
+                    </span>
+                  </p>
+                  <p style={styles.eventTime}>
+                    End Time: <span style={styles.highlight}>
+                      {event.endTime ? formatTime(event.endTime) : 'N/A'}
+                    </span>
+                  </p>
+
+
+                <p style={styles.eventContact}>Contact: <span style={styles.highlight}>{event.contactNumber || 'N/A'}</span></p>
+                <p style={styles.eventEmail}>Email: <span style={styles.highlight}>{event.email || 'N/A'}</span></p>
+                <p style={styles.eventPayment}>Payment Method: <span style={styles.highlight}>{event.paymentMethod || 'N/A'}</span></p>
+                <p style={styles.eventAttendees}>Number of Attendees: <span style={styles.highlight}>{event.numAttendees || 'N/A'}</span></p>
+                <p style={styles.eventScanned}>Scanned Count: <span style={styles.highlight}>{event.scannedCount || '0'}</span></p>
+                {event.notes && <p style={styles.eventNotes}>Notes: <span style={styles.highlight}>{event.notes}</span></p>}
+                {event.qrCode && <p style={styles.eventQr}>QR Code: <span style={styles.highlight}>{event.qrCode}</span></p>}
+              </li>
+            ))}
+          </ul>
+          
           ) : (
             <p>No events for this date.</p>
           )}
@@ -158,6 +220,8 @@ const styles = {
     padding: '20px',
     borderRadius: '12px',
     boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+    maxHeight: '500px', // Adjust the height based on your design
+    overflowY: 'auto', // Enables scrolling when content exceeds the height
   },
   calendar: {
     borderRadius: '12px',
@@ -185,6 +249,9 @@ const styles = {
   eventDetails: {
     margin: '5px 0',
   },
+  eventTime: {
+    margin: '5px 0',
+  },
   highlight: {
     fontWeight: 'bold',
     color: '#ff5733', // Highlight color for important data
@@ -201,5 +268,6 @@ const styles = {
     margin: '20px 0',
   },
 };
+
 
 export default EventCalendar;
