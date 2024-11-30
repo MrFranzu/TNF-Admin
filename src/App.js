@@ -5,7 +5,7 @@ import Login from './components/Login/Login';
 import Dashboard from './components/admin_ui/components/Dashboard/Dashboard';
 import Event from './components/admin_ui/components/BookingList/BookingList';
 import EventCalendar from './components/admin_ui/components/Calendar/Calendar';
-import QrGenerator from './components/admin_ui/components/QrGenerator/QrGenerator';
+import QrGenerator from './components/admin_ui/components/Supply/Supply';
 import QrScanner from './components/admin_ui/components/QrScanner/QrScanner';
 import EventAnalytics from './components/admin_ui/analytics/EventAnalytics';
 import './App.css';
@@ -40,7 +40,7 @@ const App = () => {
           <Route path="/dashboard" element={isLoggedIn ? <Dashboard /> : <Navigate to="/" />} />
           <Route path="/events" element={isLoggedIn ? <Event /> : <Navigate to="/" />} />
           <Route path="/calendar" element={isLoggedIn ? <EventCalendar /> : <Navigate to="/" />} />
-          <Route path="/qr-generator" element={isLoggedIn ? <QrGenerator /> : <Navigate to="/" />} />
+          <Route path="/supply" element={isLoggedIn ? <QrGenerator /> : <Navigate to="/" />} />
           <Route path="/qr-scanner" element={isLoggedIn ? <QrScanner /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to={isLoggedIn ? "/" : "/"} />} />
         </Routes>

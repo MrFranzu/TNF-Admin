@@ -20,7 +20,11 @@ const BookingList = () => {
   const [error, setError] = useState(null);
 
   const syncWithStorage = useCallback((state) => {
-    localStorage.setItem('bookings', JSON.stringify(state));
+    try {
+      localStorage.setItem('bookings', JSON.stringify(state));
+    } catch (err) {
+      console.error('Failed to sync with local storage:', err);
+    }
   }, []);
 
   const fetchBookings = async () => {
@@ -31,7 +35,6 @@ const BookingList = () => {
 
       const bookings = snapshot.docs.map((doc) => {
         const data = doc.data();
-        console.log('Fetched booking data:', data);
         return {
           id: doc.id,
           ...data,
@@ -48,9 +51,14 @@ const BookingList = () => {
   };
 
   const loadFromStorage = () => {
-    const storedData = JSON.parse(localStorage.getItem('bookings'));
-    if (storedData) {
-      setBookings(storedData);
+    try {
+      const storedData = JSON.parse(localStorage.getItem('bookings'));
+      if (storedData) {
+        setBookings(storedData);
+      }
+    } catch (err) {
+      console.error('Error loading from storage:', err);
+      setError('Failed to load local storage data.');
     }
   };
 
@@ -66,27 +74,33 @@ const BookingList = () => {
       };
 
       updatedState[targetStatus] = [...updatedState[targetStatus], updatedBooking];
-
-      syncWithStorage(updatedState);
       return updatedState;
     });
   };
 
   const deleteBooking = async (bookingId) => {
     try {
-      // Delete booking from Firestore
+      // Reference to the booking document
       const bookingRef = doc(db, 'bookings', bookingId);
+      
+      // Get the attendees subcollection
+      const attendeesCollection = collection(bookingRef, 'attendees');
+      const attendeesSnapshot = await getDocs(attendeesCollection);
+      
+      // Delete all documents in the attendees subcollection
+      const deleteAttendeesPromises = attendeesSnapshot.docs.map((doc) => deleteDoc(doc.ref));
+      await Promise.all(deleteAttendeesPromises);  // Wait for all deletions to complete
+
+      // Now delete the booking document itself
       await deleteDoc(bookingRef);
 
-      // Update local state to remove the deleted booking
+      // Update the local state to remove the booking from the UI
       setBookings((prev) => {
         const updatedState = {
           pending: prev.pending.filter((b) => b.id !== bookingId),
           ongoing: prev.ongoing.filter((b) => b.id !== bookingId),
           done: prev.done.filter((b) => b.id !== bookingId),
         };
-
-        syncWithStorage(updatedState);
         return updatedState;
       });
     } catch (err) {
@@ -112,12 +126,10 @@ const BookingList = () => {
       'Scanned Count': booking.scannedCount || 0,
     }));
 
-    console.log('Bookings for export:', allBookings);
-
     const ws = XLSX.utils.json_to_sheet(allBookings);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Bookings');
-    
+
     XLSX.writeFile(wb, 'Bookings_List.xlsx');
   };
 
@@ -150,7 +162,11 @@ const BookingList = () => {
     if (!bookings.pending.length && !bookings.ongoing.length && !bookings.done.length) {
       initialize();
     }
-  }, []);
+  }, [syncWithStorage]);
+
+  useEffect(() => {
+    syncWithStorage(bookings);
+  }, [bookings, syncWithStorage]);
 
   const renderBookings = (list, title, bgColor, targetStates) => (
     <div
@@ -160,8 +176,8 @@ const BookingList = () => {
         borderRadius: '10px',
         padding: '15px',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        maxHeight: '400px', // Limit the height
-        overflowY: 'auto', // Add scroll bar when content overflows
+        maxHeight: '400px',
+        overflowY: 'auto',
       }}
     >
       <h2 style={{ textAlign: 'center', color: '#333', marginBottom: '15px' }}>{title}</h2>
@@ -181,7 +197,6 @@ const BookingList = () => {
           >
             <strong>{booking.name || 'Unnamed Booking'}</strong>
             <div style={{ marginTop: '10px' }}>
-              {/* Show event date */}
               <p><strong>Event Date:</strong> {formatTimestamp(booking.eventDate)}</p>
               {targetStates.map(({ label, state, color }) => (
                 <button
@@ -200,12 +215,11 @@ const BookingList = () => {
                   {label}
                 </button>
               ))}
-              {/* Add the cancel button for pending bookings */}
               {title === 'Pending' && (
                 <button
                   onClick={() => deleteBooking(booking.id)}
                   style={{
-                    backgroundColor: '#f44336', // Red button
+                    backgroundColor: '#f44336',
                     color: '#fff',
                     border: 'none',
                     padding: '8px 12px',
@@ -228,7 +242,7 @@ const BookingList = () => {
     <div
       style={{
         padding: '20px',
-        backgroundColor: '#fce4ec', // Light pink background for the main page
+        backgroundColor: '#fce4ec',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -243,7 +257,7 @@ const BookingList = () => {
           alignItems: 'center',
           gap: '10px',
           marginBottom: '20px',
-          backgroundColor: '#f57c00', // Orange button
+          backgroundColor: '#f57c00',
           color: '#fff',
           padding: '12px 24px',
           borderRadius: '5px',
@@ -263,11 +277,13 @@ const BookingList = () => {
             { label: 'Move to Ongoing', state: 'ongoing', color: '#ff4081' },
             { label: 'Move to Done', state: 'done', color: '#4caf50' },
           ])}
-          {renderBookings(bookings.ongoing, 'Ongoing', '#fff3e0', [
+          {renderBookings(bookings.ongoing, 'Ongoing', '#e3f2fd', [
             { label: 'Move to Done', state: 'done', color: '#4caf50' },
+            { label: 'Move to Pending', state: 'pending', color: '#ff4081' },
           ])}
           {renderBookings(bookings.done, 'Done', '#e8f5e9', [
-            { label: 'Move to Ongoing', state: 'ongoing', color: '#ff4081' },
+            { label: 'Move to Pending', state: 'pending', color: '#ff4081' },
+            { label: 'Move to Ongoing', state: 'ongoing', color: '#03a9f4' },
           ])}
         </div>
       )}

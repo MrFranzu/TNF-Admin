@@ -11,6 +11,7 @@ import EventIcon from '@mui/icons-material/Event';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import QrCodeIcon from '@mui/icons-material/QrCode';
+import StoreIcon from '@mui/icons-material/Store'; // Add store icon for the supply
 import { useNavigate } from 'react-router-dom';
 import logo from './tnf.png';
 
@@ -20,9 +21,12 @@ const Sidebar = () => {
   const handleDashboardClick = () => navigate('/dashboard');
   const handleEventsClick = () => navigate('/events');
   const handleCalendarClick = () => navigate('/calendar');
-  const handleQrGeneratorClick = () => navigate('/qr-generator');
+  const handleQrGeneratorClick = () => {
+    window.open('https://tnfattendance.netlify.app/', '_blank'); // Open external URL
+  };
   const handleQrScannerClick = () => navigate('/qr-scanner');
-  const handleAnalysisClick = () => navigate('/analytics'); // Navigate to Booking Chart
+  const handleAnalysisClick = () => navigate('/analytics'); // Navigate to Analytics
+  const handleSupplyClick = () => navigate('/supply'); // Navigate to Supply page
 
   const ListItemLink = ({ icon, text, onClick }) => (
     <ListItem
@@ -76,16 +80,23 @@ const Sidebar = () => {
           text="Analytics"
           onClick={handleAnalysisClick} 
         />
+           <ListItemLink
+          icon={<StoreIcon />}  // You can choose another icon if you'd like
+          text="Supply"
+          onClick={handleSupplyClick}  // Link to Supply page
+        />
         <ListItemLink
           icon={<QrCodeIcon />}
           text="QR Code Generator"
-          onClick={handleQrGeneratorClick}
+          onClick={handleQrGeneratorClick} // Updated for external URL
         />
         <ListItemLink
           icon={<QrCodeIcon />}
           text="QR Code Scanner"
           onClick={handleQrScannerClick}
         />
+        {/* Add the new Supply link */}
+  
       </List>
     </Drawer>
   );

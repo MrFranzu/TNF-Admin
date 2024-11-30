@@ -168,7 +168,7 @@ const EventCalendar = () => {
                 <p style={styles.eventContact}>Contact: <span style={styles.highlight}>{event.contactNumber || 'N/A'}</span></p>
                 <p style={styles.eventEmail}>Email: <span style={styles.highlight}>{event.email || 'N/A'}</span></p>
                 <p style={styles.eventPayment}>Payment Method: <span style={styles.highlight}>{event.paymentMethod || 'N/A'}</span></p>
-                <p style={styles.eventAttendees}>Number of Attendees: <span style={styles.highlight}>{event.numAttendees || 'N/A'}</span></p>
+                <p style={styles.eventAttendees}>Expected Attendees: <span style={styles.highlight}>{event.numAttendees || 'N/A'}</span></p>
                 <p style={styles.eventScanned}>Scanned Count: <span style={styles.highlight}>{event.scannedCount || '0'}</span></p>
                 {event.notes && <p style={styles.eventNotes}>Notes: <span style={styles.highlight}>{event.notes}</span></p>}
                 {event.qrCode && <p style={styles.eventQr}>QR Code: <span style={styles.highlight}>{event.qrCode}</span></p>}
