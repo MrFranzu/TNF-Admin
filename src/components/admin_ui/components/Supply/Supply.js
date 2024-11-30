@@ -137,6 +137,12 @@ function EventSupplies() {
     textAlign: "center",
   };
 
+  // Scrollable table container style
+  const tableContainerStyle = {
+    maxHeight: "400px", // Adjust based on how tall you want the scrollable area
+    overflowY: "auto",  // Enables vertical scrolling
+  };
+
   return (
     <div style={containerStyle}>
       <h1>Supply Management</h1>
@@ -166,32 +172,34 @@ function EventSupplies() {
         )}
       </div>
 
-
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={thStyle}>Supply Name</th>
-            <th style={thStyle}>Quantity</th>
-            <th style={thStyle}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {supplies.map((supply, index) => (
-            <tr key={supply.id}>
-              <td style={tdStyle}>{supply.name}</td>
-              <td style={tdStyle}>{supply.quantity}</td>
-              <td style={tdStyle}>
-                <button style={buttonStyle} onClick={() => handleEditSupply(index)}>
-                  Edit
-                </button>
-                <button style={buttonStyle} onClick={() => handleDeleteSupply(supply.id)}>
-                  Delete
-                </button>
-              </td>
+      {/* Scrollable Table */}
+      <div style={tableContainerStyle}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Supply Name</th>
+              <th style={thStyle}>Quantity</th>
+              <th style={thStyle}>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {supplies.map((supply, index) => (
+              <tr key={supply.id}>
+                <td style={tdStyle}>{supply.name}</td>
+                <td style={tdStyle}>{supply.quantity}</td>
+                <td style={tdStyle}>
+                  <button style={buttonStyle} onClick={() => handleEditSupply(index)}>
+                    Edit
+                  </button>
+                  <button style={buttonStyle} onClick={() => handleDeleteSupply(supply.id)}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <button style={buttonStyle} onClick={handleExportExcel}>
         Export to Excel
