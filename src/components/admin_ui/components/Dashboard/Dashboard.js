@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { collection, getDocs, doc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
+import * as XLSX from "xlsx"; // Import the xlsx library
 
 const Dashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [attendees, setAttendees] = useState([]);
+  const [showDoneList, setShowDoneList] = useState(false); // State to toggle Done List view
+  const [searchQuery, setSearchQuery] = useState(""); // State for search query
 
   // Fetch bookings collection
   useEffect(() => {
@@ -71,17 +74,99 @@ const Dashboard = () => {
     return `${formattedHours}:${formattedMinutes} ${ampm}`;
   };
 
+  // Function to check if the event is done
+  const isEventDone = (eventDate) => {
+    const currentDate = new Date();
+    return eventDate.toDate() < currentDate;
+  };
+
+  // Filter bookings into "done" and "upcoming" events
+  const upcomingBookings = bookings.filter((booking) => !isEventDone(booking.eventDate));
+  const doneBookings = bookings.filter((booking) => isEventDone(booking.eventDate));
+
   const totalAttendees = attendees.length;
   const totalPeople = attendees.reduce(
     (total, attendee) => total + (attendee.numPeople || 0),
     0
   );
 
+  // Function to export attendees data to Excel
+  const exportToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(attendees.map(attendee => ({
+      "Attendee Name": attendee.name || "No Name",
+      "No. of People": attendee.numPeople || "No People Count",
+    })));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendees");
+
+    // Write to file
+    XLSX.writeFile(wb, `Attendees_${selectedDoc}.xlsx`);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Filter bookings based on search query
+  const filteredBookings = (showDoneList ? doneBookings : upcomingBookings).filter((booking) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      booking.name?.toLowerCase().includes(searchLower) ||
+      formatDate(booking.eventDate).toLowerCase().includes(searchLower) ||
+      formatTime(booking.startTime).toLowerCase().includes(searchLower) ||
+      formatTime(booking.endTime).toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Filter attendees based on search query
+  const filteredAttendees = attendees.filter((attendee) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      attendee.name?.toLowerCase().includes(searchLower) ||
+      (attendee.numPeople && attendee.numPeople.toString().includes(searchLower))
+    );
+  });
+
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", color: "#3c1361" }}>
-      <h1 style={{ color: "#5a189a", borderBottom: "2px solid #c77dff", paddingBottom: "10px" }}>
-        Bookings Dashboard
-      </h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1 style={{ color: "#5a189a", borderBottom: "2px solid #c77dff", paddingBottom: "10px" }}>
+          Bookings Dashboard
+        </h1>
+        <button
+          onClick={() => setShowDoneList(!showDoneList)}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#6a1b9a",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+          }}
+        >
+          {showDoneList ? "Show Upcoming Events" : "Show Done Events"}
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div style={{ marginTop: "20px", marginBottom: "20px" }}>
+        <input
+          type="text"
+          placeholder="Search bookings or attendees..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          style={{
+            padding: "10px",
+            width: "100%",
+            maxWidth: "400px",
+            border: "1px solid #c77dff",
+            borderRadius: "5px",
+          }}
+        />
+      </div>
+
       <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
         {/* Bookings List */}
         <div
@@ -90,13 +175,13 @@ const Dashboard = () => {
             backgroundColor: "#f3f0ff",
             padding: "20px",
             borderRadius: "8px",
-            maxHeight: "400px",  // Set max height for scrolling
+            maxHeight: "400px", // Set max height for scrolling
             overflowY: "auto",  // Enable vertical scrolling
           }}
         >
-          <h2 style={{ color: "#6a1b9a" }}>Bookings</h2>
+          <h2 style={{ color: "#6a1b9a" }}>{showDoneList ? "Done Events" : "Upcoming Events"}</h2>
           <ul style={{ listStyle: "none", padding: 0 }}>
-            {bookings.map((booking) => (
+            {filteredBookings.map((booking) => (
               <li
                 key={booking.id}
                 onClick={() => handleDocClick(booking.id)}
@@ -133,7 +218,7 @@ const Dashboard = () => {
             }}
           >
             <h2 style={{ color: "#6a1b9a" }}>Attendees for {selectedDoc}</h2>
-            {attendees.length > 0 ? (
+            {filteredAttendees.length > 0 ? (
               <div>
                 <table
                   style={{
@@ -149,7 +234,7 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {attendees.map((attendee) => (
+                    {filteredAttendees.map((attendee) => (
                       <tr key={attendee.id} style={{ borderBottom: "1px solid #c77dff" }}>
                         <td style={{ padding: "10px" }}>{attendee.name || "No Name"}</td>
                         <td style={{ padding: "10px" }}>{attendee.numPeople || "No People Count"}</td>
@@ -160,6 +245,21 @@ const Dashboard = () => {
                 <div style={{ marginTop: "20px", fontWeight: "bold" }}>
                   <p>Total Attendees: {totalAttendees}</p>
                   <p>Total No. of People: {totalPeople}</p>
+                  {/* Button to Export to Excel */}
+                  <button
+                    onClick={exportToExcel}
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: "#6a1b9a",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "5px",
+                      cursor: "pointer",
+                      marginTop: "20px",
+                    }}
+                  >
+                    Download Attendance
+                  </button>
                 </div>
               </div>
             ) : (

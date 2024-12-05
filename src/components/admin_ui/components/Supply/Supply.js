@@ -10,6 +10,7 @@ function EventSupplies() {
   const [newQuantity, setNewQuantity] = useState("");
   const [editIndex, setEditIndex] = useState(null);
   const [editId, setEditId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState(""); // New state for search query
 
   const suppliesCollectionRef = collection(db, "supplies");
 
@@ -89,6 +90,15 @@ function EventSupplies() {
     const file = new Blob([excelBuffer], { type: "application/octet-stream" });
     saveAs(file, "supplies_list.xlsx");
   };
+
+  // Filter supplies based on search query
+  const filteredSupplies = supplies.filter((supply) => {
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    return (
+      supply.name.toLowerCase().includes(lowerCaseQuery) ||
+      supply.quantity.toString().includes(lowerCaseQuery)
+    );
+  });
 
   const containerStyle = {
     backgroundColor: "#EEE6F3",
@@ -172,6 +182,17 @@ function EventSupplies() {
         )}
       </div>
 
+      {/* Search Bar */}
+      <div>
+        <input
+          type="text"
+          style={inputStyle}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search Supplies"
+        />
+      </div>
+
       {/* Scrollable Table */}
       <div style={tableContainerStyle}>
         <table style={tableStyle}>
@@ -183,7 +204,7 @@ function EventSupplies() {
             </tr>
           </thead>
           <tbody>
-            {supplies.map((supply, index) => (
+            {filteredSupplies.map((supply, index) => (
               <tr key={supply.id}>
                 <td style={tdStyle}>{supply.name}</td>
                 <td style={tdStyle}>{supply.quantity}</td>
@@ -202,7 +223,7 @@ function EventSupplies() {
       </div>
 
       <button style={buttonStyle} onClick={handleExportExcel}>
-        Export to Excel
+        Download Supply
       </button>
     </div>
   );

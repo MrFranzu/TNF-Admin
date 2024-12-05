@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db1 } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { Line } from 'react-chartjs-2';
@@ -72,45 +72,61 @@ const suggestPricingAdjustments = (predictions, baseRate) => {
 
 // Generate insights based on predictions
 const generateInsights = (predictions, resources, pricing) => {
-  // Group months by their demand level (high or low)
-  const peakMonths = predictions.filter(item => item.predictedBookings > 5);
-  const lowDemandMonths = predictions.filter(item => item.predictedBookings <= 5);
+  const sortedByDemand = [...predictions].sort((a, b) => b.predictedBookings - a.predictedBookings);
 
-  // Get unique months for each category (High demand and Low demand)
-  const peakMonthNames = peakMonths.map(item => new Date(0, item.month).toLocaleString('en-US', { month: 'long' }));
-  const lowDemandMonthNames = lowDemandMonths.map(item => new Date(0, item.month).toLocaleString('en-US', { month: 'long' }));
+  // Get top 3 high demand months
+  const topHighDemand = sortedByDemand.slice(0, 3).map(item =>
+    new Date(0, item.month).toLocaleString('en-US', { month: 'long' })
+  );
 
-  // Use Set to get unique month names for both categories
-  const uniquePeakMonths = [...new Set(peakMonthNames)];
-  const uniqueLowDemandMonths = [...new Set(lowDemandMonthNames)];
+  // Get top 3 low demand months
+  const topLowDemand = sortedByDemand.slice(-3).map(item =>
+    new Date(0, item.month).toLocaleString('en-US', { month: 'long' })
+  );
 
   return (
     <div>
-      <h3 style={{ fontSize: '20px', marginBottom: '10px' }}>Predictive Insights:</h3>
-      <ul style={{ fontSize: '16px', lineHeight: '1.8' }}>
-        {uniquePeakMonths.length > 0 && (
+      <h3 style={{ fontSize: '20px', marginBottom: '10px', fontWeight: '600', color: '#333' }}>Predictive Insights:</h3>
+      <ul style={{ fontSize: '16px', lineHeight: '1.8', color: '#555' }}>
+        {topHighDemand.length > 0 && (
           <li>
-            <strong>High Demand:</strong> Months with significant bookings ({uniquePeakMonths.join(', ')}) may require increased pricing and additional resources.
+            <strong style={{ color: '#2d2d2d' }}>Top 3 High Demand Months:</strong>
+            <p>These months are predicted to have the highest bookings:</p>
+            <ul>
+              {topHighDemand.map((monthName, index) => (
+                <li key={index}>{monthName}</li>
+              ))}
+            </ul>
+            <p>Strategies for high-demand months:</p>
+            <ul>
+              <li>Increase prices to maximize revenue.</li>
+              <li>Ensure sufficient staffing and resources.</li>
+              <li>Offer promotions to encourage early bookings.</li>
+            </ul>
           </li>
         )}
-        {uniqueLowDemandMonths.length > 0 && (
+
+        {topLowDemand.length > 0 && (
           <li>
-            <strong>Low Demand:</strong> For months with lower bookings ({uniqueLowDemandMonths.join(', ')}) consider promotional pricing or discounts.
+            <strong style={{ color: '#2d2d2d' }}>Top 3 Low Demand Months:</strong>
+            <p>These months are predicted to have the lowest bookings:</p>
+            <ul>
+              {topLowDemand.map((monthName, index) => (
+                <li key={index}>{monthName}</li>
+              ))}
+            </ul>
+            <p>Strategies for low-demand months:</p>
+            <ul>
+              <li>Offer discounts or flash sales to attract customers.</li>
+              <li>Optimize resource allocation to minimize costs.</li>
+              <li>Focus on targeted marketing to boost demand.</li>
+            </ul>
           </li>
         )}
-        <li>
-          <strong>Resource Allocation:</strong> Ensure adequate staffing and supplies during peak months.
-        </li>
-        <li>
-          <strong>Pricing Strategy:</strong> Optimize revenue by adjusting prices during high-demand periods.
-        </li>
       </ul>
     </div>
   );
 };
-
-
-
 
 const BookingTrend = () => {
   const [predictedBookingTrendByMonth, setPredictedBookingTrendByMonth] = useState([]);
@@ -138,14 +154,30 @@ const BookingTrend = () => {
     fetchEvents();
   }, []);
 
+  const predictedBookingTrendByMonthMemo = useMemo(() => {
+    return predictedBookingTrendByMonth;
+  }, [predictedBookingTrendByMonth]);
+
+  // Aggregate data for "All Years"
+  const getAggregatedMonthlyData = () => {
+    const monthlyAggregates = Array(12).fill(0);
+    predictedBookingTrendByMonthMemo.forEach(item => {
+      monthlyAggregates[item.month] += item.predictedBookings;
+    });
+    return monthlyAggregates.map((total, month) => ({
+      month,
+      predictedBookings: total,
+    }));
+  };
+
   const filteredMonthlyTrend = selectedYear
-    ? predictedBookingTrendByMonth.filter(item => item.year === selectedYear)
-    : predictedBookingTrendByMonth;
+    ? predictedBookingTrendByMonthMemo.filter(item => item.year === selectedYear)
+    : getAggregatedMonthlyData();
 
-  const availableYears = [...new Set(predictedBookingTrendByMonth.map(item => item.year))];
+  const availableYears = [...new Set(predictedBookingTrendByMonthMemo.map(item => item.year))];
 
-  const resourceNeeds = determineResourceNeeds(filteredMonthlyTrend);
-  const pricingStrategies = suggestPricingAdjustments(filteredMonthlyTrend, 100);
+  const resourceNeeds = useMemo(() => determineResourceNeeds(filteredMonthlyTrend), [filteredMonthlyTrend]);
+  const pricingStrategies = useMemo(() => suggestPricingAdjustments(filteredMonthlyTrend, 100), [filteredMonthlyTrend]);
 
   return (
     <div style={{ overflowY: 'auto', maxHeight: '80vh', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
@@ -156,12 +188,18 @@ const BookingTrend = () => {
       ) : (
         <div>
           <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-            <label htmlFor="year-filter" style={{ fontSize: '18px', marginRight: '10px' }}>Select Year:</label>
+            <label htmlFor="year-filter" style={{ fontSize: '18px', marginRight: '10px', color: '#333' }}>Select Year:</label>
             <select
               id="year-filter"
               value={selectedYear || ''}
               onChange={e => setSelectedYear(parseInt(e.target.value) || null)}
-              style={{ padding: '5px', fontSize: '16px' }}
+              style={{
+                padding: '8px',
+                fontSize: '16px',
+                fontFamily: 'Arial, sans-serif',
+                borderRadius: '4px',
+                border: '1px solid #ddd',
+              }}
             >
               <option value="">All Years</option>
               {availableYears.map(year => (
@@ -170,38 +208,35 @@ const BookingTrend = () => {
             </select>
           </div>
 
-          <h3 style={{ fontSize: '24px', marginBottom: '20px' }}>Predicted Booking Trend (Monthly)</h3>
+          <h3 style={{ fontSize: '24px', marginBottom: '20px', color: '#333' }}>Predicted Booking Trend (Monthly)</h3>
           <div style={{ width: '1000px', height: '400px', margin: '0 auto' }}>
             <Line
               data={{
                 labels: [...Array(12).keys()].map(month => new Date(0, month).toLocaleString('en-US', { month: 'short' })),
-                datasets: [
-                  {
-                    label: 'Predicted Bookings',
-                    data: filteredMonthlyTrend.map(item => item.predictedBookings),
-                    borderColor: 'rgb(255, 99, 132)',
-                    fill: false,
-                  },
-                  {
-                    label: 'Resource Needs',
-                    data: resourceNeeds.map(item => item.resources),
-                    borderColor: 'rgb(54, 162, 235)',
-                    fill: false,
-                  },
-                  {
-                    label: 'Suggested Pricing',
-                    data: pricingStrategies.map(item => item.suggestedPrice),
-                    borderColor: 'rgb(75, 192, 192)',
-                    fill: false,
-                  },
-                ],
+                datasets: [{
+                  label: 'Predicted Bookings',
+                  data: filteredMonthlyTrend.map(item => item.predictedBookings),
+                  borderColor: 'rgba(75,192,192,1)',
+                  fill: false,
+                }],
               }}
-              options={{ responsive: true, maintainAspectRatio: false }}
+              options={{
+                responsive: true,
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      stepSize: 2,
+                    },
+                  },
+                },
+              }}
             />
           </div>
 
-          {/* Predictive Insights Section */}
-          {generateInsights(filteredMonthlyTrend, resourceNeeds, pricingStrategies)}
+          <div style={{ marginTop: '40px' }}>
+            {generateInsights(filteredMonthlyTrend, resourceNeeds, pricingStrategies)}
+          </div>
         </div>
       )}
     </div>

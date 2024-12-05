@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db1 } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
-import { Line } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';  
 import { ThreeDots } from 'react-loader-spinner';
-import { predictResources, predictInventory } from '../utils';
+
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const ResourceForecast = () => {
   const [resourceForecast, setResourceForecast] = useState([]);
@@ -11,6 +14,7 @@ const ResourceForecast = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState(5); // default filter: Top 5
+  const [eventBookings, setEventBookings] = useState({}); // new state for event bookings
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -23,20 +27,18 @@ const ResourceForecast = () => {
 
         const resourceGroups = {};
         const inventoryGroups = {};
+        const bookingsCount = {};  // Store total bookings for each event
 
         eventData.forEach(event => {
           if (event["Event/Occasion"]) {
             const resources = predictResources(event);
             const inventory = predictInventory(event);
 
-            if (!resources || !inventory) {
-              return;
-            }
+            if (!resources || !inventory) return;
 
             const constrainedResources = {
               seating: Math.min(Math.max(resources.seating, 0), 200),
               catering: Math.min(Math.max(resources.catering, 0), 100),
-              staff: Math.min(Math.max(resources.staff, 0), 50),
             };
 
             const constrainedInventory = {
@@ -45,16 +47,18 @@ const ResourceForecast = () => {
             };
 
             if (!resourceGroups[event["Event/Occasion"]]) {
-              resourceGroups[event["Event/Occasion"]] = { seating: 0, catering: 0, staff: 0 };
+              resourceGroups[event["Event/Occasion"]] = { seating: 0, catering: 0 };
               inventoryGroups[event["Event/Occasion"]] = { food: 0, drinks: 0 };
+              bookingsCount[event["Event/Occasion"]] = 0; // Initialize booking count
             }
 
             resourceGroups[event["Event/Occasion"]].seating += constrainedResources.seating;
             resourceGroups[event["Event/Occasion"]].catering += constrainedResources.catering;
-            resourceGroups[event["Event/Occasion"]].staff += constrainedResources.staff;
 
             inventoryGroups[event["Event/Occasion"]].food += constrainedInventory.food;
             inventoryGroups[event["Event/Occasion"]].drinks += constrainedInventory.drinks;
+
+            bookingsCount[event["Event/Occasion"]] += 1;  // Count the bookings for this event type
           }
         });
 
@@ -70,6 +74,8 @@ const ResourceForecast = () => {
 
         setResourceForecast(combinedResourceForecast);
         setInventoryForecast(combinedInventoryForecast);
+        setEventBookings(bookingsCount); // Set the event bookings data
+
       } catch (error) {
         console.error('Error fetching data from Firestore:', error);
         setError("Failed to load data. Please try again later.");
@@ -81,115 +87,43 @@ const ResourceForecast = () => {
     fetchEvents();
   }, []);
 
-  const handleFilterChange = (e) => {
-    setFilter(Number(e.target.value));
-  };
+  const handleFilterChange = (e) => setFilter(Number(e.target.value));
 
-  // Sort by total resources (seating + catering + staff) for each event
-  const sortedResourceForecast = [...resourceForecast].map(forecast => {
-    const totalResources = forecast.resources.seating + forecast.resources.catering + forecast.resources.staff;
-    return { ...forecast, totalResources };
-  }).sort((a, b) => b.totalResources - a.totalResources); // Sort by total resources in descending order
+  const predictResources = (event) => ({
+    seating: Math.random() * 100 + 50,  // Simulated seating
+    catering: Math.random() * 50 + 25,  // Simulated catering
+  });
 
-  const filteredResourceForecast = sortedResourceForecast.slice(0, filter); // Apply filter
+  const predictInventory = (event) => ({
+    food: Math.random() * 200 + 100,  // Simulated food
+    drinks: Math.random() * 100 + 50,  // Simulated drinks
+  });
 
-  // Sort by total inventory (food + drinks) for each event
-  const sortedInventoryForecast = [...inventoryForecast].map(forecast => {
-    const totalInventory = forecast.inventory.food + forecast.inventory.drinks;
-    return { ...forecast, totalInventory };
-  }).sort((a, b) => b.totalInventory - a.totalInventory); // Sort by total inventory in descending order
+  // Optimize sorting with useMemo to avoid unnecessary recalculations
+  const sortedResourceForecast = useMemo(() => {
+    return [...resourceForecast].sort((a, b) => eventBookings[b.eventName] - eventBookings[a.eventName]); // Sort by total bookings
+  }, [resourceForecast, eventBookings]);
 
-  const filteredInventoryForecast = sortedInventoryForecast.slice(0, filter); // Apply filter
+  const filteredResourceForecast = useMemo(() => sortedResourceForecast.slice(0, filter), [sortedResourceForecast, filter]);
 
-  const generatePredictiveInsights = () => {
-  // Use filtered data for both resources and inventory forecasts
-  const totalResources = filteredResourceForecast.reduce((acc, forecast) => {
-    acc.seating += forecast.resources.seating;
-    acc.catering += forecast.resources.catering;
-    acc.staff += forecast.resources.staff;
-    return acc;
-  }, { seating: 0, catering: 0, staff: 0 });
+  const sortedInventoryForecast = useMemo(() => {
+    return [...inventoryForecast].sort((a, b) => eventBookings[b.eventName] - eventBookings[a.eventName]); // Sort by total bookings
+  }, [inventoryForecast, eventBookings]);
 
-  const totalInventory = filteredInventoryForecast.reduce((acc, forecast) => {
-    acc.food += forecast.inventory.food;
-    acc.drinks += forecast.inventory.drinks;
-    return acc;
-  }, { food: 0, drinks: 0 });
-
-  // Calculate average demand per resource and inventory from the filtered data
-  const avgResourceDemand = {
-    seating: totalResources.seating / filteredResourceForecast.length,
-    catering: totalResources.catering / filteredResourceForecast.length,
-    staff: totalResources.staff / filteredResourceForecast.length,
-  };
-
-  const avgInventoryDemand = {
-    food: totalInventory.food / filteredInventoryForecast.length,
-    drinks: totalInventory.drinks / filteredInventoryForecast.length,
-  };
-
-  // Simple Trend Calculation: Assume the last few entries indicate the future growth (basic linear prediction)
-  const lastResource = filteredResourceForecast[filteredResourceForecast.length - 1];
-  const lastInventory = filteredInventoryForecast[filteredInventoryForecast.length - 1];
-
-  const resourceTrend = {
-    seating: lastResource.resources.seating - filteredResourceForecast[filteredResourceForecast.length - 2]?.resources.seating || 0,
-    catering: lastResource.resources.catering - filteredResourceForecast[filteredResourceForecast.length - 2]?.resources.catering || 0,
-    staff: lastResource.resources.staff - filteredResourceForecast[filteredResourceForecast.length - 2]?.resources.staff || 0,
-  };
-
-  const inventoryTrend = {
-    food: lastInventory.inventory.food - filteredInventoryForecast[filteredInventoryForecast.length - 2]?.inventory.food || 0,
-    drinks: lastInventory.inventory.drinks - filteredInventoryForecast[filteredInventoryForecast.length - 2]?.inventory.drinks || 0,
-  };
-
-  // Predict next period based on trends
-  const predictedResources = {
-    seating: Math.max(0, totalResources.seating + resourceTrend.seating),
-    catering: Math.max(0, totalResources.catering + resourceTrend.catering),
-    staff: Math.max(0, totalResources.staff + resourceTrend.staff),
-  };
-
-  const predictedInventory = {
-    food: Math.max(0, totalInventory.food + inventoryTrend.food),
-    drinks: Math.max(0, totalInventory.drinks + inventoryTrend.drinks),
-  };
-
-  return `
-    Total Resources (Filtered Data): 
-    Seating: ${totalResources.seating} (Average: ${avgResourceDemand.seating.toFixed(2)})
-    Catering: ${totalResources.catering} (Average: ${avgResourceDemand.catering.toFixed(2)})
-    Staff: ${totalResources.staff} (Average: ${avgResourceDemand.staff.toFixed(2)})
-
-    Predicted Resources for Next Period:
-    Seating: ${predictedResources.seating.toFixed(2)}
-    Catering: ${predictedResources.catering.toFixed(2)}
-    Staff: ${predictedResources.staff.toFixed(2)}
-
-    Total Inventory (Filtered Data):
-    Food: ${totalInventory.food} (Average: ${avgInventoryDemand.food.toFixed(2)})
-    Drinks: ${totalInventory.drinks} (Average: ${avgInventoryDemand.drinks.toFixed(2)})
-
-    Predicted Inventory for Next Period:
-    Food: ${predictedInventory.food.toFixed(2)}
-    Drinks: ${predictedInventory.drinks.toFixed(2)}
-  `;
-};
+  const filteredInventoryForecast = useMemo(() => sortedInventoryForecast.slice(0, filter), [sortedInventoryForecast, filter]);
 
   return (
     <div style={{ maxHeight: '80vh', overflowY: 'scroll', paddingRight: '15px' }}>
       {loading ? (
-        <div><ThreeDots color="gray" /></div>
+        <div><ThreeDots color="grey" height="80" width="80" /></div>
       ) : error ? (
-        <div style={{ color: 'red', fontSize: '18px', fontWeight: 'bold', marginTop: '20px' }}>{error}</div>
+        <div>{error}</div>
       ) : (
         <div>
-          <h3 style={{ fontSize: '24px', color: '#333', textAlign: 'center' }}>Resource and Inventory Forecast</h3>
-
-          {/* Filter Dropdown */}
-          <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-            <label htmlFor="filter">Filter by Top: </label>
-            <select id="filter" value={filter} onChange={handleFilterChange}>
+          <h4>Resource Forecast</h4>
+          <div>
+            <label>Filter Top: </label>
+            <select onChange={handleFilterChange} value={filter}>
               <option value={5}>Top 5</option>
               <option value={10}>Top 10</option>
               <option value={20}>Top 20</option>
@@ -198,82 +132,50 @@ const ResourceForecast = () => {
 
           {filteredResourceForecast.length > 0 && filteredInventoryForecast.length > 0 && (
             <div style={{ width: '1000px', height: '600px', margin: '40px auto' }}>
-              <Line
+              <Bar
                 data={{
                   labels: filteredResourceForecast.map(forecast => forecast.eventName),
                   datasets: [
                     {
                       label: 'Seating (Predicted)',
                       data: filteredResourceForecast.map(forecast => forecast.resources.seating),
-                      borderColor: 'rgb(75, 192, 192)',
-                      fill: false,
-                      borderWidth: 2,
-                      pointRadius: 5,
-                      borderDash: [5, 5],
+                      backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                      borderColor: 'rgb(255, 99, 132)',
+                      borderWidth: 1,
                     },
                     {
                       label: 'Catering (Predicted)',
                       data: filteredResourceForecast.map(forecast => forecast.resources.catering),
-                      borderColor: 'rgb(153, 102, 255)',
-                      fill: false,
-                      borderWidth: 2,
-                      pointRadius: 5,
-                      borderDash: [5, 5],
-                    },
-                    {
-                      label: 'Staff (Predicted)',
-                      data: filteredResourceForecast.map(forecast => forecast.resources.staff),
+                      backgroundColor: 'rgba(255, 159, 64, 0.2)',
                       borderColor: 'rgb(255, 159, 64)',
-                      fill: false,
-                      borderWidth: 2,
-                      pointRadius: 5,
-                      borderDash: [5, 5],
+                      borderWidth: 1,
                     },
                     {
                       label: 'Food (Predicted)',
                       data: filteredInventoryForecast.map(forecast => forecast.inventory.food),
-                      borderColor: 'rgb(0, 255, 0)', // Change to green for food
-                      fill: false,
-                      borderWidth: 2,
-                      pointRadius: 5,
-                      borderDash: [5, 5],
+                      backgroundColor: 'rgba(0, 255, 0, 0.2)',
+                      borderColor: 'rgb(0, 255, 0)',
+                      borderWidth: 1,
                     },
                     {
                       label: 'Drinks (Predicted)',
                       data: filteredInventoryForecast.map(forecast => forecast.inventory.drinks),
-                      borderColor: 'rgb(255, 99, 132)',
-                      fill: false,
-                      borderWidth: 2,
-                      pointRadius: 5,
-                      borderDash: [5, 5],
+                      backgroundColor: 'rgba(0, 0, 255, 0.2)',
+                      borderColor: 'rgb(0, 0, 255)',
+                      borderWidth: 1,
                     },
                   ],
                 }}
                 options={{
                   responsive: true,
-                  maintainAspectRatio: false,
                   scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        font: {
-                          size: 14,
-                        },
-                      },
-                    },
                     x: {
-                      ticks: {
-                        font: {
-                          size: 14,
-                        },
-                        autoSkip: false,
-                      },
+                      title: { display: true, text: 'Event Name' },
+                      grid: { display: false },
                     },
-                  },
-                  plugins: {
-                    legend: {
-                      display: true,
-                      position: 'top',
+                    y: {
+                      title: { display: true, text: 'Forecasted Values' },
+                      beginAtZero: true,
                     },
                   },
                 }}
@@ -281,10 +183,36 @@ const ResourceForecast = () => {
             </div>
           )}
 
-          {/* Display predictive insights */}
-          <div style={{ marginTop: '30px', textAlign: 'center' }}>
-            <h4>Predictive Insights:</h4>
-            <pre>{generatePredictiveInsights()}</pre>
+          <div style={{ margin: '40px 0', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+            {filteredResourceForecast.map((forecast, index) => {
+              const totalBookings = eventBookings[forecast.eventName];
+              return (
+                <div key={forecast.eventName} style={{ padding: '20px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)' }}>
+                  <h4 style={{ fontSize: '20px', color: '#333' }}>{forecast.eventName}</h4>
+                  <div style={{ marginBottom: '10px' }}>
+                    <strong>Seating (Predicted):</strong> {forecast.resources.seating}
+                  </div>
+                  <div style={{ marginBottom: '10px' }}>
+                    <strong>Catering (Predicted):</strong> {forecast.resources.catering}
+                  </div>
+                  <div style={{ marginBottom: '10px' }}>
+                    <strong>Food (Predicted):</strong> {filteredInventoryForecast[index].inventory.food}
+                  </div>
+                  <div style={{ marginBottom: '10px' }}>
+                    <strong>Drinks (Predicted):</strong> {filteredInventoryForecast[index].inventory.drinks}
+                  </div>
+                  <div style={{ marginTop: '20px' }}>
+                    <strong>Insights:</strong>
+                    <ul>
+                      <li>Seating per booking: {(forecast.resources.seating / totalBookings).toFixed(2)}</li>
+                      <li>Catering per booking: {(forecast.resources.catering / totalBookings).toFixed(2)}</li>
+                      <li>Food per booking: {(filteredInventoryForecast[index].inventory.food / totalBookings).toFixed(2)}</li>
+                      <li>Drinks per booking: {(filteredInventoryForecast[index].inventory.drinks / totalBookings).toFixed(2)}</li>
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
