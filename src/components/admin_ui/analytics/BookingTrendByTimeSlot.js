@@ -4,7 +4,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { Line } from 'react-chartjs-2';
 import { ThreeDots } from 'react-loader-spinner';
 
-// Moving Average function for smoothing
+// Moving Average function for smoothing historical data
 const movingAverage = (data, windowSize) => {
   let result = [];
   let sum = 0;
@@ -18,7 +18,7 @@ const movingAverage = (data, windowSize) => {
   return result;
 };
 
-// Exponential Smoothing function for enhanced predictions
+// Exponential Smoothing for better future predictions
 const exponentialSmoothing = (data, alpha) => {
   let result = [data[0]];
   for (let i = 1; i < data.length; i++) {
@@ -27,7 +27,7 @@ const exponentialSmoothing = (data, alpha) => {
   return result;
 };
 
-// Predict booking trends by month
+// Predict future booking trends based on historical data
 const predictBookingTrendByMonth = (events) => {
   const timeSlots = events.map(event => new Date(event.Date));
   timeSlots.sort((a, b) => a - b);
@@ -41,6 +41,7 @@ const predictBookingTrendByMonth = (events) => {
     predictions[year][month] += 1;
   });
 
+  // Apply smoothing to improve prediction accuracy
   const monthlyPredictions = Object.entries(predictions).flatMap(([year, months]) =>
     months.map((monthBookings, monthIndex) => ({
       year: parseInt(year),
@@ -52,34 +53,32 @@ const predictBookingTrendByMonth = (events) => {
   return monthlyPredictions;
 };
 
-// Suggest resource needs based on predictions
+// Calculate resource needs based on booking predictions
 const determineResourceNeeds = (predictions) => {
-  const resourceFactor = 2;
+  const resourceFactor = 2; // Adjust as needed for your use case
   return predictions.map(month => ({
     month: month.month,
     resources: Math.ceil(month.predictedBookings * resourceFactor)
   }));
 };
 
-// Suggest adaptive pricing strategies
+// Suggest dynamic pricing strategies based on demand
 const suggestPricingAdjustments = (predictions, baseRate) => {
-  const baseDemandThreshold = 5;
+  const baseDemandThreshold = 5; // Threshold to adjust prices
   return predictions.map(month => ({
     month: month.month,
     suggestedPrice: baseRate + (month.predictedBookings / baseDemandThreshold) * baseRate
   }));
 };
 
-// Generate insights based on predictions
+// Generate actionable insights and strategies for users
 const generateInsights = (predictions, resources, pricing) => {
   const sortedByDemand = [...predictions].sort((a, b) => b.predictedBookings - a.predictedBookings);
 
-  // Get top 3 high demand months
+  // Identify top 3 high and low demand months
   const topHighDemand = sortedByDemand.slice(0, 3).map(item =>
     new Date(0, item.month).toLocaleString('en-US', { month: 'long' })
   );
-
-  // Get top 3 low demand months
   const topLowDemand = sortedByDemand.slice(-3).map(item =>
     new Date(0, item.month).toLocaleString('en-US', { month: 'long' })
   );
@@ -87,6 +86,9 @@ const generateInsights = (predictions, resources, pricing) => {
   return (
     <div>
       <h3 style={{ fontSize: '20px', marginBottom: '10px', fontWeight: '600', color: '#333' }}>Predictive Insights:</h3>
+      <p style={{ fontSize: '14px', marginBottom: '20px', color: '#666' }}>
+        Based on predicted bookings, here are the top months to focus on and strategic advice for optimizing resources and pricing.
+      </p>
       <ul style={{ fontSize: '16px', lineHeight: '1.8', color: '#555' }}>
         {topHighDemand.length > 0 && (
           <li>
@@ -154,20 +156,14 @@ const BookingTrend = () => {
     fetchEvents();
   }, []);
 
-  const predictedBookingTrendByMonthMemo = useMemo(() => {
-    return predictedBookingTrendByMonth;
-  }, [predictedBookingTrendByMonth]);
+  const predictedBookingTrendByMonthMemo = useMemo(() => predictedBookingTrendByMonth, [predictedBookingTrendByMonth]);
 
-  // Aggregate data for "All Years"
   const getAggregatedMonthlyData = () => {
     const monthlyAggregates = Array(12).fill(0);
     predictedBookingTrendByMonthMemo.forEach(item => {
       monthlyAggregates[item.month] += item.predictedBookings;
     });
-    return monthlyAggregates.map((total, month) => ({
-      month,
-      predictedBookings: total,
-    }));
+    return monthlyAggregates.map((total, month) => ({ month, predictedBookings: total }));
   };
 
   const filteredMonthlyTrend = selectedYear
@@ -209,6 +205,9 @@ const BookingTrend = () => {
           </div>
 
           <h3 style={{ fontSize: '24px', marginBottom: '20px', color: '#333' }}>Predicted Booking Trend (Monthly)</h3>
+          <p style={{ fontSize: '14px', marginBottom: '10px', color: '#666' }}>
+            The graph below shows the predicted number of bookings for each month, helping you plan resources and pricing strategies accordingly.
+          </p>
           <div style={{ width: '1000px', height: '400px', margin: '0 auto' }}>
             <Line
               data={{

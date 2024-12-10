@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db1 } from '../firebaseConfig';
 import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { Line } from 'react-chartjs-2';
@@ -72,6 +72,7 @@ const predictCheckInPatterns = (events) => {
   const checkInTimes = events.map(event => parseCheckInTime(event["Check-in Time"]));
   const checkInGroups = {};
 
+  // Group check-ins by hour
   checkInTimes.forEach(time => {
     const hour = time.getHours();
     const hourLabel = to12HourFormat(hour);
@@ -82,6 +83,7 @@ const predictCheckInPatterns = (events) => {
     checkInGroups[hourLabel] += 1;
   });
 
+  // Sort hours and calculate predictions
   const sortedHours = Object.keys(checkInGroups).sort((a, b) => {
     const get24Hour = (timeLabel) => {
       const [hour, period] = timeLabel.split(' ');
@@ -99,7 +101,7 @@ const predictCheckInPatterns = (events) => {
   });
 
   const checkInArray = sortedHours.map(hour => checkInGroups[hour]);
-  const predictedCheckIns = weightedMovingAverage(checkInArray, 3); 
+  const predictedCheckIns = weightedMovingAverage(checkInArray, 3);
 
   return sortedHours.map((hour, index) => ({
     hour: hour,
@@ -139,8 +141,6 @@ const CheckInPatternsByHour = () => {
 
     return () => unsubscribe();
   }, []);
-
-  const checkInArray = checkInPattern.map(item => item.predictedCheckIns);
 
   const peakCheckInTime = checkInPattern.reduce((prev, curr) => 
     prev.predictedCheckIns > curr.predictedCheckIns ? prev : curr, {});
@@ -198,15 +198,17 @@ const CheckInPatternsByHour = () => {
           </div>
           
           <div style={{ marginTop: '20px', fontSize: '18px' }}>
+            <p><strong>Insights</strong></p>
+            <p>This chart shows predicted check-in counts per hour. Use this to plan staff or resources effectively for peak times.</p>
             <p>The predicted peak check-in time is at <strong>{peakCheckInTime.hour}</strong> with approximately <strong>{Math.round(peakCheckInTime.predictedCheckIns)}</strong> check-ins.</p>
             {increasingTrend && (
-              <p>Recent check-ins show an increasing trend, indicating a potential rise in event attendance. Ensure sufficient resources are available.</p>
+              <p>Recent check-ins show an increasing trend, indicating a potential rise in event attendance. Ensure sufficient resources are available during peak hours.</p>
             )}
             {decreasingTrend && (
               <p>Recent check-ins show a decreasing trend, suggesting a tapering attendance. Consider reallocating resources to other areas.</p>
             )}
             {!increasingTrend && !decreasingTrend && (
-              <p>The check-in pattern is stable. Monitor for any shifts in behavior over time.</p>
+              <p>The check-in pattern is stable. Monitor for any shifts in behavior over time, as things may change.</p>
             )}
           </div>
         </div>

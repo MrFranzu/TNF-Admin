@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { FaDownload } from 'react-icons/fa';
 
@@ -19,7 +19,7 @@ const BookingList = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(''); // New state for search query
+  const [searchQuery, setSearchQuery] = useState('');
 
   const syncWithStorage = useCallback((state) => {
     try {
@@ -65,17 +65,27 @@ const BookingList = () => {
   const moveBooking = (booking, targetStatus) => {
     setBookings((prev) => {
       const updatedBooking = { ...booking };
-      updatedBooking.scannedCount = updatedBooking.scannedCount || 0;
-
+  
+      // Remove the booking from all states
       const updatedState = {
         pending: prev.pending.filter((b) => b.id !== booking.id),
         ongoing: prev.ongoing.filter((b) => b.id !== booking.id),
         done: prev.done.filter((b) => b.id !== booking.id),
       };
-
+  
+      // Add it to the target status
       updatedState[targetStatus] = [...updatedState[targetStatus], updatedBooking];
+  
+      // Save updated state to localStorage
+      localStorage.setItem('bookings', JSON.stringify(updatedState));
+  
       return updatedState;
     });
+  };
+
+  const updateBookingStatus = async (booking, targetStatus) => {
+    const bookingRef = doc(db, 'bookings', booking.id);
+    await updateDoc(bookingRef, { status: targetStatus });
   };
 
   const deleteBooking = async (bookingId) => {
@@ -117,7 +127,7 @@ const BookingList = () => {
       'Payment Method': booking.paymentMethod || 'N/A',
       'Num Attendees': booking.numAttendees || 'N/A',
       Notes: booking.notes || 'N/A',
-      'Scanned Count': booking.scannedCount || 0,
+      'Menu Package': booking.menuPackage || 'N/A',
     }));
 
     const ws = XLSX.utils.json_to_sheet(allBookings);
@@ -161,35 +171,57 @@ const BookingList = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const currentTime = new Date();
+      const currentDate = new Date().setHours(0, 0, 0, 0); // Start of today
+  
       setBookings((prevState) => {
-        let updatedState = { ...prevState };
-        updatedState.pending.forEach((booking) => {
-          const startTime = new Date(booking.startTime);
-          const endTime = new Date(booking.endTime);
-          if (currentTime >= startTime && currentTime < endTime) {
+        const updatedState = { ...prevState };
+  
+        // Move bookings from "pending" to "ongoing" based on the event date
+        updatedState.pending = updatedState.pending.filter((booking) => {
+          const eventDate = new Date(booking.eventDate.seconds * 1000).setHours(0, 0, 0, 0); // Normalize to just date (no time)
+  
+          if (eventDate === currentDate) {
             moveBooking(booking, 'ongoing');
+            return false; // Remove from pending
           }
+          return true;
         });
-        updatedState.ongoing.forEach((booking) => {
-          const endTime = new Date(booking.endTime);
-          if (currentTime >= endTime) {
+  
+        // Move bookings from "ongoing" to "done" based on the event date
+        updatedState.ongoing = updatedState.ongoing.filter((booking) => {
+          const eventDate = new Date(booking.eventDate.seconds * 1000).setHours(0, 0, 0, 0); // Normalize to just date (no time)
+          
+          if (eventDate < currentDate) {
             moveBooking(booking, 'done');
+            return false; // Remove from ongoing
           }
+          return true;
         });
+  
+        // Move bookings from "pending" to "done" if event date has already passed
+        updatedState.pending = updatedState.pending.filter((booking) => {
+          const eventDate = new Date(booking.eventDate.seconds * 1000).setHours(0, 0, 0, 0); // Normalize to just date (no time)
+          
+          if (eventDate < currentDate) {
+            moveBooking(booking, 'done');
+            return false; // Remove from pending
+          }
+          return true;
+        });
+  
         return updatedState;
       });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
+    }, 1000); // Run every 1 second
+  
+    return () => clearInterval(interval); // Cleanup on component unmount
+  }, [moveBooking]);
+  
   // Search function
   const filterBookings = (bookingsList) => {
     if (!searchQuery) return bookingsList; // If searchQuery is empty, return the full list
     return bookingsList.filter((booking) => {
       const searchLower = searchQuery.toLowerCase();
-  
+
       return (
         (booking.name && booking.name.toLowerCase().includes(searchLower)) ||
         (booking.eventType && booking.eventType.toLowerCase().includes(searchLower)) ||
@@ -200,7 +232,6 @@ const BookingList = () => {
       );
     });
   };
-  
 
   const renderBookings = (list, title, bgColor) => (
     <div
@@ -314,7 +345,7 @@ const BookingList = () => {
       ) : (
         <div style={{ display: 'flex', gap: '20px', width: '100%', justifyContent: 'center' }}>
           {renderBookings(filterBookings(bookings.pending), 'Pending', '#9c27b0')}
-          {renderBookings(filterBookings(bookings.ongoing), 'Ongoing', '#7e57c2')}
+          {renderBookings(filterBookings(bookings.ongoing), 'Todays Event', '#7e57c2')}
           {renderBookings(filterBookings(bookings.done), 'Done', '#673ab7')}
         </div>
       )}

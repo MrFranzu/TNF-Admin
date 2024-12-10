@@ -74,15 +74,24 @@ const Dashboard = () => {
     return `${formattedHours}:${formattedMinutes} ${ampm}`;
   };
 
-  // Function to check if the event is done
-  const isEventDone = (eventDate) => {
+  // Function to check if the event is done (based on event end time)
+  const isEventDone = (eventDate, eventEndTime) => {
     const currentDate = new Date();
-    return eventDate.toDate() < currentDate;
+    const eventEndDate = new Date(eventDate.toDate());
+
+    // Extract hours and minutes from eventEndTime and set them to eventEndDate
+    if (eventEndTime) {
+      const [eventEndHours, eventEndMinutes] = eventEndTime.split(":").map(Number);
+      eventEndDate.setHours(eventEndHours, eventEndMinutes, 0, 0); // Set time on the date
+    }
+
+    // Compare the full event end date and time to the current date and time
+    return eventEndDate < currentDate;
   };
 
   // Filter bookings into "done" and "upcoming" events
-  const upcomingBookings = bookings.filter((booking) => !isEventDone(booking.eventDate));
-  const doneBookings = bookings.filter((booking) => isEventDone(booking.eventDate));
+  const upcomingBookings = bookings.filter((booking) => !isEventDone(booking.eventDate, booking.endTime));
+  const doneBookings = bookings.filter((booking) => isEventDone(booking.eventDate, booking.endTime));
 
   const totalAttendees = attendees.length;
   const totalPeople = attendees.reduce(
@@ -179,7 +188,7 @@ const Dashboard = () => {
             overflowY: "auto",  // Enable vertical scrolling
           }}
         >
-          <h2 style={{ color: "#6a1b9a" }}>{showDoneList ? "Done Events" : "Upcoming Events"}</h2>
+          <h2 style={{ color: "#6a1b9a" }}>{showDoneList ? "Done Events" : "Events"}</h2>
           <ul style={{ listStyle: "none", padding: 0 }}>
             {filteredBookings.map((booking) => (
               <li
@@ -224,46 +233,50 @@ const Dashboard = () => {
                   style={{
                     width: "100%",
                     borderCollapse: "collapse",
-                    marginTop: "10px",
+                    marginTop: "20px",
+                    border: "1px solid #ddd",
+                    borderRadius: "5px",
                   }}
                 >
                   <thead>
-                    <tr style={{ backgroundColor: "#d0bfff", color: "#3c1361" }}>
-                      <th style={{ padding: "10px", textAlign: "left" }}>Attendee Name</th>
-                      <th style={{ padding: "10px", textAlign: "left" }}>No. of People</th>
+                    <tr>
+                      <th style={{ padding: "8px", border: "1px solid #ddd" }}>Attendee Name</th>
+                      <th style={{ padding: "8px", border: "1px solid #ddd" }}>No. of People</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAttendees.map((attendee) => (
-                      <tr key={attendee.id} style={{ borderBottom: "1px solid #c77dff" }}>
-                        <td style={{ padding: "10px" }}>{attendee.name || "No Name"}</td>
-                        <td style={{ padding: "10px" }}>{attendee.numPeople || "No People Count"}</td>
+                      <tr key={attendee.id}>
+                        <td style={{ padding: "8px", border: "1px solid #ddd" }}>{attendee.name || "No Name"}</td>
+                        <td style={{ padding: "8px", border: "1px solid #ddd" }}>
+                          {attendee.numPeople || "No People Count"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div style={{ marginTop: "20px", fontWeight: "bold" }}>
-                  <p>Total Attendees: {totalAttendees}</p>
-                  <p>Total No. of People: {totalPeople}</p>
-                  {/* Button to Export to Excel */}
-                  <button
-                    onClick={exportToExcel}
-                    style={{
-                      padding: "10px 20px",
-                      backgroundColor: "#6a1b9a",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "5px",
-                      cursor: "pointer",
-                      marginTop: "20px",
-                    }}
-                  >
-                    Download Attendance
-                  </button>
+                <div style={{ marginTop: "20px", fontSize: "16px" }}>
+                  <strong>Total Attendees: {totalAttendees}</strong>
+                  <br />
+                  <strong>Total People: {totalPeople}</strong>
                 </div>
+                <button
+                  onClick={exportToExcel}
+                  style={{
+                    marginTop: "20px",
+                    padding: "10px 20px",
+                    backgroundColor: "#6a1b9a",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Export to Excel
+                </button>
               </div>
             ) : (
-              <p style={{ color: "#6a1b9a" }}>No attendees found</p>
+              <p>No attendees available.</p>
             )}
           </div>
         )}
