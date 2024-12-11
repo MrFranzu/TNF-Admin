@@ -14,11 +14,14 @@ import QrCodeIcon from '@mui/icons-material/QrCode';
 import StoreIcon from '@mui/icons-material/Store'; // Add store icon for the supply
 import { useNavigate } from 'react-router-dom';
 import logo from './tnf.png';
+import GroupIcon from '@mui/icons-material/Group'; // Make sure to import GroupIcon
+
 
 const Sidebar = () => {
   const navigate = useNavigate();
 
   const handleDashboardClick = () => navigate('/dashboard');
+  const handleAttendClick = () => navigate('/attend');
   const handleEventsClick = () => navigate('/events');
   const handleCalendarClick = () => navigate('/calendar');
   const handleQrGeneratorClick = () => {
@@ -66,6 +69,11 @@ const Sidebar = () => {
           onClick={handleDashboardClick}
         />
         <ListItemLink
+          icon={<GroupIcon />}
+          text="Attendees"
+          onClick={handleAttendClick}
+        />
+        <ListItemLink
           icon={<EventIcon />}
           text="Booking List"
           onClick={handleEventsClick}
@@ -80,23 +88,21 @@ const Sidebar = () => {
           text="Analytics"
           onClick={handleAnalysisClick} 
         />
-           <ListItemLink
-          icon={<StoreIcon />}  // You can choose another icon if you'd like
+        <ListItemLink
+          icon={<StoreIcon />}
           text="Supply"
-          onClick={handleSupplyClick}  // Link to Supply page
+          onClick={handleSupplyClick} 
         />
         <ListItemLink
           icon={<QrCodeIcon />}
           text="QR Code Generator"
-          onClick={handleQrGeneratorClick} // Updated for external URL
+          onClick={handleQrGeneratorClick}
         />
         <ListItemLink
           icon={<QrCodeIcon />}
           text="QR Code Scanner"
           onClick={handleQrScannerClick}
         />
-        {/* Add the new Supply link */}
-  
       </List>
     </Drawer>
   );

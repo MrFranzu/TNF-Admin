@@ -1,285 +1,311 @@
-import React, { useEffect, useState } from "react";
-import { collection, getDocs, doc } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
 import { db } from "../../firebaseConfig";
-import * as XLSX from "xlsx"; // Import the xlsx library
+import { collection, getDocs } from "firebase/firestore";
+import { Pie, Bar } from "react-chartjs-2";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
+import "chart.js/auto";
+import './yep.css';
 
 const Dashboard = () => {
   const [bookings, setBookings] = useState([]);
-  const [selectedDoc, setSelectedDoc] = useState(null);
-  const [attendees, setAttendees] = useState([]);
-  const [showDoneList, setShowDoneList] = useState(false); // State to toggle Done List view
-  const [searchQuery, setSearchQuery] = useState(""); // State for search query
+  const [supplies, setSupplies] = useState([]);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [highlightedDates, setHighlightedDates] = useState([]);
+  const [chartData, setChartData] = useState({
+    eventTypeData: { labels: [], datasets: [] },
+    eventThemeData: { labels: [], datasets: [] },
+  });
+  const [totals, setTotals] = useState({
+    totalBookings: 0,
+    totalAttendees: 0,
+  });
 
-  // Fetch bookings collection
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const bookingsCollection = collection(db, "bookings");
-        const bookingsSnapshot = await getDocs(bookingsCollection);
-        const bookingsData = bookingsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setBookings(bookingsData);
-      } catch (error) {
-        console.error("Error fetching bookings:", error);
-      }
-    };
-
-    fetchBookings();
-  }, []);
-
-  // Fetch attendees collection for a selected document
-  const fetchAttendees = async (docId) => {
+  const fetchBookings = async () => {
     try {
-      const docRef = doc(db, "bookings", docId);
-      const attendeesCollection = collection(docRef, "attendees");
-      const attendeesSnapshot = await getDocs(attendeesCollection);
-      const attendeesData = attendeesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAttendees(attendeesData);
+      const bookingsRef = collection(db, "bookings");
+      const snapshot = await getDocs(bookingsRef);
+      const fetchedBookings = [];
+      snapshot.forEach((doc) => {
+        fetchedBookings.push({ id: doc.id, ...doc.data() });
+      });
+      setBookings(fetchedBookings);
+      processAnalytics(fetchedBookings);
     } catch (error) {
-      console.error("Error fetching attendees:", error);
+      console.error("Error fetching bookings:", error);
     }
   };
 
-  const handleDocClick = (docId) => {
-    setSelectedDoc(docId);
-    fetchAttendees(docId);
+  const fetchSupplies = async () => {
+    try {
+      const suppliesRef = collection(db, "supplies");
+      const snapshot = await getDocs(suppliesRef);
+      const fetchedSupplies = [];
+      snapshot.forEach((doc) => {
+        fetchedSupplies.push({ id: doc.id, ...doc.data() });
+      });
+      setSupplies(fetchedSupplies);
+    } catch (error) {
+      console.error("Error fetching supplies:", error);
+    }
   };
 
-  // Function to format timestamp into a readable date string
-  const formatDate = (timestamp) => {
-    if (!timestamp) return "No Date";
-    const date = timestamp.toDate();
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+  const processAnalytics = (bookingsData) => {
+    if (!bookingsData || bookingsData.length === 0) return;
+    const eventTypeCount = {};
+    const eventThemeCount = {};
+    let totalBookings = bookingsData.length;
+    let totalAttendees = 0;
+    const dates = [];
+    bookingsData.forEach((booking) => {
+      if (booking.eventType) {
+        eventTypeCount[booking.eventType] =
+          (eventTypeCount[booking.eventType] || 0) + 1;
+      }
+      if (booking.eventTheme) {
+        eventThemeCount[booking.eventTheme] =
+          (eventThemeCount[booking.eventTheme] || 0) + 1;
+      }
+      if (booking.eventDate) {
+        dates.push(new Date(booking.eventDate.seconds * 1000));
+      }
+      totalAttendees += booking.numAttendees || 0;
+    });
+    setTotals({ totalBookings, totalAttendees });
+    setHighlightedDates(dates);
+    setChartData({
+      eventTypeData: {
+        labels: Object.keys(eventTypeCount),
+        datasets: [
+          {
+            label: "Event Types",
+            data: Object.values(eventTypeCount),
+            backgroundColor: ["#D6B9F3", "#BBA4EE", "#9F8EDD"],
+          },
+        ],
+      },
+      eventThemeData: {
+        labels: Object.keys(eventThemeCount),
+        datasets: [
+          {
+            label: "Event Themes",
+            data: Object.values(eventThemeCount),
+            backgroundColor: ["#C8A2E6", "#A682D6", "#8C6CC9", "#7239B7"],
+          },
+        ],
+      },
     });
   };
 
-  // Function to format time into 12-hour format with AM/PM
-  const formatTime = (timeStr) => {
-    if (!timeStr) return "No Time";
-
-    const [hours, minutes] = timeStr.split(":").map(Number);
-    const ampm = hours >= 12 ? "PM" : "AM";
-    const formattedHours = hours % 12 || 12;
-    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
-
-    return `${formattedHours}:${formattedMinutes} ${ampm}`;
-  };
-
-  // Function to check if the event is done (based on event end time)
-  const isEventDone = (eventDate, eventEndTime) => {
-    const currentDate = new Date();
-    const eventEndDate = new Date(eventDate.toDate());
-
-    // Extract hours and minutes from eventEndTime and set them to eventEndDate
-    if (eventEndTime) {
-      const [eventEndHours, eventEndMinutes] = eventEndTime.split(":").map(Number);
-      eventEndDate.setHours(eventEndHours, eventEndMinutes, 0, 0); // Set time on the date
-    }
-
-    // Compare the full event end date and time to the current date and time
-    return eventEndDate < currentDate;
-  };
-
-  // Filter bookings into "done" and "upcoming" events
-  const upcomingBookings = bookings.filter((booking) => !isEventDone(booking.eventDate, booking.endTime));
-  const doneBookings = bookings.filter((booking) => isEventDone(booking.eventDate, booking.endTime));
-
-  const totalAttendees = attendees.length;
-  const totalPeople = attendees.reduce(
-    (total, attendee) => total + (attendee.numPeople || 0),
-    0
-  );
-
-  // Function to export attendees data to Excel
-  const exportToExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(attendees.map(attendee => ({
-      "Attendee Name": attendee.name || "No Name",
-      "No. of People": attendee.numPeople || "No People Count",
-    })));
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendees");
-
-    // Write to file
-    XLSX.writeFile(wb, `Attendees_${selectedDoc}.xlsx`);
-  };
-
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-  };
-
-  // Filter bookings based on search query
-  const filteredBookings = (showDoneList ? doneBookings : upcomingBookings).filter((booking) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      booking.name?.toLowerCase().includes(searchLower) ||
-      formatDate(booking.eventDate).toLowerCase().includes(searchLower) ||
-      formatTime(booking.startTime).toLowerCase().includes(searchLower) ||
-      formatTime(booking.endTime).toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Filter attendees based on search query
-  const filteredAttendees = attendees.filter((attendee) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      attendee.name?.toLowerCase().includes(searchLower) ||
-      (attendee.numPeople && attendee.numPeople.toString().includes(searchLower))
-    );
-  });
+  useEffect(() => {
+    fetchBookings();
+    fetchSupplies();
+  }, []);
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", color: "#3c1361" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ color: "#5a189a", borderBottom: "2px solid #c77dff", paddingBottom: "10px" }}>
-          Bookings Dashboard
-        </h1>
-        <button
-          onClick={() => setShowDoneList(!showDoneList)}
+    <div
+      style={{
+        backgroundColor: "#f9f9ff",
+        padding: "30px",
+        fontFamily: "'Roboto', sans-serif",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        height: "100vh",
+      }}
+    >
+      <h1 style={{ textAlign: "center", color: "#4a148c", marginBottom: "20px" }}>
+        Dashboard
+      </h1>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          width: "100%",
+          marginBottom: "30px",
+        }}
+      >
+        <div
           style={{
-            padding: "10px 20px",
-            backgroundColor: "#6a1b9a",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
+            backgroundColor: "#D6B9F3",
+            padding: "20px",
+            borderRadius: "10px",
+            color: "#4a148c",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            width: "45%",
           }}
         >
-          {showDoneList ? "Show Upcoming Events" : "Show Done Events"}
-        </button>
-      </div>
-
-      {/* Search Bar */}
-      <div style={{ marginTop: "20px", marginBottom: "20px" }}>
-        <input
-          type="text"
-          placeholder="Search bookings or attendees..."
-          value={searchQuery}
-          onChange={handleSearchChange}
+          <h3>Total Bookings</h3>
+          <h2>{totals.totalBookings}</h2>
+        </div>
+        <div
           style={{
-            padding: "10px",
-            width: "100%",
-            maxWidth: "400px",
-            border: "1px solid #c77dff",
-            borderRadius: "5px",
+            backgroundColor: "#D6B9F3",
+            padding: "20px",
+            borderRadius: "10px",
+            color: "#4a148c",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            width: "45%",
           }}
-        />
+        >
+          <h3>Total Attendees</h3>
+          <h2>{totals.totalAttendees}</h2>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
-        {/* Bookings List */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          width: "100%",
+          gap: "20px",
+        }}
+      >
         <div
           style={{
             flex: 1,
-            backgroundColor: "#f3f0ff",
+            backgroundColor: "#fff",
             padding: "20px",
-            borderRadius: "8px",
-            maxHeight: "400px", // Set max height for scrolling
-            overflowY: "auto",  // Enable vertical scrolling
+            borderRadius: "10px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            maxWidth: "350px",
           }}
         >
-          <h2 style={{ color: "#6a1b9a" }}>{showDoneList ? "Done Events" : "Events"}</h2>
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {filteredBookings.map((booking) => (
-              <li
-                key={booking.id}
-                onClick={() => handleDocClick(booking.id)}
-                style={{
-                  margin: "10px 0",
-                  padding: "15px",
-                  backgroundColor: selectedDoc === booking.id ? "#9d4edd" : "#d0bfff",
-                  color: selectedDoc === booking.id ? "white" : "#3c1361",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                <div>
-                  <strong>{booking.name || "No Event Name"}</strong>
-                  <div>{`Event Date: ${formatDate(booking.eventDate)}`}</div>
-                  <div>{`Start Time: ${formatTime(booking.startTime) || "No Start Time"}`}</div>
-                  <div>{`End Time: ${formatTime(booking.endTime) || "No End Time"}`}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <h3>Supplies List</h3>
+          {supplies.length > 0 ? (
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                textAlign: "left",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      backgroundColor: "#9F8EDD",
+                      color: "white",
+                      padding: "10px",
+                    }}
+                  >
+                    Name
+                  </th>
+                  <th
+                    style={{
+                      backgroundColor: "#9F8EDD",
+                      color: "white",
+                      padding: "10px",
+                    }}
+                  >
+                    Quantity
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {supplies.map((supply) => (
+                  <tr key={supply.id}>
+                    <td
+                      style={{
+                        border: "1px solid #ddd",
+                        padding: "10px",
+                      }}
+                    >
+                      {supply.name}
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #ddd",
+                        padding: "10px",
+                      }}
+                    >
+                      {supply.quantity}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>No supplies available</p>
+          )}
         </div>
 
-        {/* Attendees List */}
-        {selectedDoc && (
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            maxWidth: "350px",
+          }}
+        >
+          <h3>Booked Dates</h3>
           <div
             style={{
-              flex: 2,
-              backgroundColor: "#f3f0ff",
-              padding: "20px",
-              borderRadius: "8px",
-              maxHeight: "400px", // Set max height for scrolling
-              overflowY: "auto",  // Enable vertical scrolling
+              maxWidth: "200px",
+              maxHeight: "200px",
+              margin: "0 auto",
             }}
           >
-            <h2 style={{ color: "#6a1b9a" }}>Attendees for {selectedDoc}</h2>
-            {filteredAttendees.length > 0 ? (
-              <div>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    marginTop: "20px",
-                    border: "1px solid #ddd",
-                    borderRadius: "5px",
-                  }}
-                >
-                  <thead>
-                    <tr>
-                      <th style={{ padding: "8px", border: "1px solid #ddd" }}>Attendee Name</th>
-                      <th style={{ padding: "8px", border: "1px solid #ddd" }}>No. of People</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAttendees.map((attendee) => (
-                      <tr key={attendee.id}>
-                        <td style={{ padding: "8px", border: "1px solid #ddd" }}>{attendee.name || "No Name"}</td>
-                        <td style={{ padding: "8px", border: "1px solid #ddd" }}>
-                          {attendee.numPeople || "No People Count"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div style={{ marginTop: "20px", fontSize: "16px" }}>
-                  <strong>Total Attendees: {totalAttendees}</strong>
-                  <br />
-                  <strong>Total People: {totalPeople}</strong>
-                </div>
-                <button
-                  onClick={exportToExcel}
-                  style={{
-                    marginTop: "20px",
-                    padding: "10px 20px",
-                    backgroundColor: "#6a1b9a",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "5px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Export to Excel
-                </button>
-              </div>
-            ) : (
-              <p>No attendees available.</p>
-            )}
+            <Calendar
+              value={calendarDate}
+              onChange={setCalendarDate}
+              tileClassName={({ date }) =>
+                highlightedDates.some(
+                  (d) =>
+                    d.getFullYear() === date.getFullYear() &&
+                    d.getMonth() === date.getMonth() &&
+                    d.getDate() === date.getDate()
+                )
+                  ? "highlight"
+                  : null
+              }
+            />
           </div>
-        )}
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            maxWidth: "350px",
+          }}
+        >
+          <h3>Event Type Distribution</h3>
+          {chartData.eventTypeData.labels.length > 0 ? (
+            <div style={{ maxWidth: "250px", margin: "0 auto" }}>
+              <Pie data={chartData.eventTypeData} />
+            </div>
+          ) : (
+            <p>No data available</p>
+          )}
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#fff",
+            padding: "20px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            maxWidth: "350px",
+          }}
+        >
+          <h3>Event Theme Distribution</h3>
+          {chartData.eventThemeData.labels.length > 0 ? (
+            <div style={{ maxWidth: "250px", margin: "0 auto" }}>
+              <Bar data={chartData.eventThemeData} />
+            </div>
+          ) : (
+            <p>No data available</p>
+          )}
+        </div>
       </div>
     </div>
   );

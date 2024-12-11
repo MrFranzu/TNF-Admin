@@ -12,27 +12,32 @@ const QrScanner = () => {
   const handleResult = useCallback(
     async (scanResult) => {
       if (!scanResult?.text) return;
-
+  
       // Indicate that scanning has started
       setIsScanning(true);
-
+  
       const scannedData = scanResult.text.trim();
       setLastScannedData(scannedData);
-
+  
       try {
-        const { eventCode, name, numPeople } = JSON.parse(scannedData);
+        const { eventCode, attendees, totalPeople } = JSON.parse(scannedData);
         const eventRef = doc(db, 'bookings', eventCode);
-
+  
         const docSnap = await getDoc(eventRef);
-        const attendeeRef = doc(db, 'bookings', eventCode, 'attendees', name);
-
+  
         if (docSnap.exists()) {
-          await setDoc(attendeeRef, {
-            name,
-            numPeople,
-            scannedAt: new Date().toISOString(),
-          }, { merge: true });
-          setStatusMessage('Attendee successfully scanned and saved.');
+          // Process scanned attendees
+          attendees.forEach(async (attendee) => {
+            const attendeeRef = doc(db, 'bookings', eventCode, 'attendees', attendee.name);
+  
+            await setDoc(attendeeRef, {
+              name: attendee.name,
+              numPeople: attendee.numPeople,
+              scannedAt: new Date().toISOString(),
+            }, { merge: true });
+          });
+  
+          setStatusMessage(`Event: ${eventCode} - Attendees scanned successfully.`);
         } else {
           setStatusMessage('Event not found in the database.');
         }
@@ -40,7 +45,7 @@ const QrScanner = () => {
         console.error('Error handling scanned data:', err);
         setStatusMessage('Invalid QR code data.');
       }
-
+  
       // Reset scanning status after a short delay
       setTimeout(() => {
         setIsScanning(false);
@@ -49,6 +54,7 @@ const QrScanner = () => {
     },
     []
   );
+  
 
   const debounceScan = useCallback(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
