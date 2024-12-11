@@ -111,7 +111,7 @@ const Dashboard = () => {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        height: "100vh",
+        minHeight: "100vh",
       }}
     >
       <h1 style={{ textAlign: "center", color: "#4a148c", marginBottom: "20px" }}>
@@ -121,56 +121,51 @@ const Dashboard = () => {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           justifyContent: "space-between",
+          gap: "20px",
           width: "100%",
           marginBottom: "30px",
         }}
       >
-        <div
-          style={{
-            backgroundColor: "#D6B9F3",
-            padding: "20px",
-            borderRadius: "10px",
-            color: "#4a148c",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            width: "45%",
-          }}
-        >
-          <h3>Total Bookings</h3>
-          <h2>{totals.totalBookings}</h2>
-        </div>
-        <div
-          style={{
-            backgroundColor: "#D6B9F3",
-            padding: "20px",
-            borderRadius: "10px",
-            color: "#4a148c",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            width: "45%",
-          }}
-        >
-          <h3>Total Attendees</h3>
-          <h2>{totals.totalAttendees}</h2>
-        </div>
+        {[
+          { label: "Total Bookings", value: totals.totalBookings },
+          { label: "Total Attendees", value: totals.totalAttendees },
+        ].map((card, idx) => (
+          <div
+            key={idx}
+            style={{
+              backgroundColor: "#D6B9F3",
+              padding: "20px",
+              borderRadius: "10px",
+              color: "#4a148c",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+              flex: "1 1 calc(50% - 10px)",
+              textAlign: "center",
+            }}
+          >
+            <h3>{card.label}</h3>
+            <h2>{card.value}</h2>
+          </div>
+        ))}
       </div>
 
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
+          gap: "20px",
           justifyContent: "space-between",
           width: "100%",
-          gap: "20px",
         }}
       >
         <div
           style={{
-            flex: 1,
+            flex: "1 1 calc(33% - 20px)",
             backgroundColor: "#fff",
             padding: "20px",
             borderRadius: "10px",
             boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            maxWidth: "350px",
           }}
         >
           <h3>Supplies List</h3>
@@ -184,43 +179,27 @@ const Dashboard = () => {
             >
               <thead>
                 <tr>
-                  <th
-                    style={{
-                      backgroundColor: "#9F8EDD",
-                      color: "white",
-                      padding: "10px",
-                    }}
-                  >
-                    Name
-                  </th>
-                  <th
-                    style={{
-                      backgroundColor: "#9F8EDD",
-                      color: "white",
-                      padding: "10px",
-                    }}
-                  >
-                    Quantity
-                  </th>
+                  {["Name", "Quantity"].map((header, idx) => (
+                    <th
+                      key={idx}
+                      style={{
+                        backgroundColor: "#9F8EDD",
+                        color: "white",
+                        padding: "10px",
+                      }}
+                    >
+                      {header}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {supplies.map((supply) => (
                   <tr key={supply.id}>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "10px",
-                      }}
-                    >
+                    <td style={{ border: "1px solid #ddd", padding: "10px" }}>
                       {supply.name}
                     </td>
-                    <td
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "10px",
-                      }}
-                    >
+                    <td style={{ border: "1px solid #ddd", padding: "10px" }}>
                       {supply.quantity}
                     </td>
                   </tr>
@@ -234,12 +213,11 @@ const Dashboard = () => {
 
         <div
           style={{
-            flex: 1,
+            flex: "1 1 calc(33% - 20px)",
             backgroundColor: "#fff",
             padding: "20px",
             borderRadius: "10px",
             boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            maxWidth: "350px",
           }}
         >
           <h3>Booked Dates</h3>
@@ -267,45 +245,30 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            backgroundColor: "#fff",
-            padding: "20px",
-            borderRadius: "10px",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            maxWidth: "350px",
-          }}
-        >
-          <h3>Event Type Distribution</h3>
-          {chartData.eventTypeData.labels.length > 0 ? (
-            <div style={{ maxWidth: "250px", margin: "0 auto" }}>
-              <Pie data={chartData.eventTypeData} />
-            </div>
-          ) : (
-            <p>No data available</p>
-          )}
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            backgroundColor: "#fff",
-            padding: "20px",
-            borderRadius: "10px",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            maxWidth: "350px",
-          }}
-        >
-          <h3>Event Theme Distribution</h3>
-          {chartData.eventThemeData.labels.length > 0 ? (
-            <div style={{ maxWidth: "250px", margin: "0 auto" }}>
-              <Bar data={chartData.eventThemeData} />
-            </div>
-          ) : (
-            <p>No data available</p>
-          )}
-        </div>
+        {[
+          { label: "Event Type Distribution", data: chartData.eventTypeData, Component: Pie },
+          { label: "Event Theme Distribution", data: chartData.eventThemeData, Component: Bar },
+        ].map((chart, idx) => (
+          <div
+            key={idx}
+            style={{
+              flex: "1 1 calc(33% - 20px)",
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "10px",
+              boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            }}
+          >
+            <h3>{chart.label}</h3>
+            {chart.data.labels.length > 0 ? (
+              <div style={{ maxWidth: "250px", margin: "0 auto" }}>
+                <chart.Component data={chart.data} />
+              </div>
+            ) : (
+              <p>No data available</p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

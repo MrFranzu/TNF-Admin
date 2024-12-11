@@ -37,22 +37,23 @@ const EventCalendar = () => {
         let startTime = data.startTime;
         let endTime = data.endTime;
         let menuPackage = data.menuPackage;
-
+        let eventTheme = data.eventTheme; // Fetch eventTheme
+  
         if (eventDate instanceof Timestamp) {
           eventDate = eventDate.toDate();
         } else if (eventDate && typeof eventDate === 'string') {
           eventDate = new Date(eventDate);
         }
-
+  
         if (startTime instanceof Timestamp) {
           startTime = startTime.toDate();
         }
-
+  
         if (endTime instanceof Timestamp) {
           endTime = endTime.toDate();
         }
-
-        return { id: doc.id, ...data, eventDate, startTime, endTime, menuPackage };
+  
+        return { id: doc.id, ...data, eventDate, startTime, endTime, menuPackage, eventTheme }; // Include eventTheme
       });
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -148,25 +149,28 @@ const EventCalendar = () => {
           <h2 style={styles.eventsTitle}>Event on {date.toDateString()}:</h2>
           {eventsForSelectedDate.length > 0 ? (
             <ul style={styles.eventsList}>
-              {eventsForSelectedDate.map(event => (
-                <li key={event.id} style={styles.eventItem}>
-                  <strong style={styles.eventName}>{event.name || 'Unnamed Event'}</strong>
-                  <p style={styles.eventDetails}>
-                    {event.eventType || 'Unnamed Type'} - 
-                    <span style={styles.highlight}>
-                      {event.eventDate instanceof Date ? event.eventDate.toDateString() : 'N/A'}
-                    </span>
-                  </p>
-                  <p style={styles.eventTime}>
-                    Start Time: <span style={styles.highlight}>
-                      {event.startTime ? formatTime(event.startTime) : 'N/A'}
-                    </span>
-                  </p>
-                  <p style={styles.eventTime}>
-                    End Time: <span style={styles.highlight}>
-                      {event.endTime ? formatTime(event.endTime) : 'N/A'}
-                    </span>
-                  </p>
+            {eventsForSelectedDate.map(event => (
+              <li key={event.id} style={styles.eventItem}>
+                <strong style={styles.eventName}>{event.name || 'Unnamed Event'}</strong>
+                <p style={styles.eventDetails}>
+                  {event.eventType || 'Unnamed Type'} - 
+                  <span style={styles.highlight}>
+                    {event.eventDate instanceof Date ? event.eventDate.toDateString() : 'N/A'}
+                  </span>
+                </p>
+                <p style={styles.eventTheme}>
+                  Theme: <span style={styles.highlight}>{event.eventTheme || 'No theme specified'}</span>
+                </p>
+                <p style={styles.eventTime}>
+                  Start Time: <span style={styles.highlight}>
+                    {event.startTime ? formatTime(event.startTime) : 'N/A'}
+                  </span>
+                </p>
+                <p style={styles.eventTime}>
+                  End Time: <span style={styles.highlight}>
+                    {event.endTime ? formatTime(event.endTime) : 'N/A'}
+                  </span>
+                </p>
 
                   <p style={styles.eventContact}>Contact: <span style={styles.highlight}>{event.contactNumber || 'N/A'}</span></p>
                   <p style={styles.eventEmail}>Email: <span style={styles.highlight}>{event.email || 'N/A'}</span></p>
