@@ -36,9 +36,14 @@ const EventCalendar = () => {
         let eventDate = data.eventDate;
         let startTime = data.startTime;
         let endTime = data.endTime;
-        let menuPackage = data.menuPackage;
-        let eventTheme = data.eventTheme; // Fetch eventTheme
   
+        // Fetching additional fields
+        let location = data.location;
+        let event = data.event; // Assuming 'event' refers to the event name or details
+        let eventType = data.eventType; // Type of event
+        let eventTheme = data.eventTheme; // Existing field
+  
+        // Handling timestamps
         if (eventDate instanceof Timestamp) {
           eventDate = eventDate.toDate();
         } else if (eventDate && typeof eventDate === 'string') {
@@ -53,7 +58,7 @@ const EventCalendar = () => {
           endTime = endTime.toDate();
         }
   
-        return { id: doc.id, ...data, eventDate, startTime, endTime, menuPackage, eventTheme }; // Include eventTheme
+        return { id: doc.id, ...data, eventDate, startTime, endTime, location, event, eventType, eventTheme };
       });
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -61,6 +66,7 @@ const EventCalendar = () => {
       return [];
     }
   };
+  
 
   useEffect(() => {
     const getBookings = async () => {
@@ -149,28 +155,30 @@ const EventCalendar = () => {
           <h2 style={styles.eventsTitle}>Event on {date.toDateString()}:</h2>
           {eventsForSelectedDate.length > 0 ? (
             <ul style={styles.eventsList}>
-            {eventsForSelectedDate.map(event => (
-              <li key={event.id} style={styles.eventItem}>
-                <strong style={styles.eventName}>{event.name || 'Unnamed Event'}</strong>
-                <p style={styles.eventDetails}>
-                  {event.eventType || 'Unnamed Type'} - 
-                  <span style={styles.highlight}>
-                    {event.eventDate instanceof Date ? event.eventDate.toDateString() : 'N/A'}
-                  </span>
-                </p>
-                <p style={styles.eventTheme}>
-                  Theme: <span style={styles.highlight}>{event.eventTheme || 'No theme specified'}</span>
-                </p>
-                <p style={styles.eventTime}>
-                  Start Time: <span style={styles.highlight}>
-                    {event.startTime ? formatTime(event.startTime) : 'N/A'}
-                  </span>
-                </p>
-                <p style={styles.eventTime}>
-                  End Time: <span style={styles.highlight}>
-                    {event.endTime ? formatTime(event.endTime) : 'N/A'}
-                  </span>
-                </p>
+           {eventsForSelectedDate.map(event => (
+  <li key={event.id} style={styles.eventItem}>
+    {/* Make eventTheme the main title */}
+    <strong style={styles.eventName}>{event.eventTheme || 'Unnamed Theme'}</strong>
+    <p style={styles.eventDetails}>
+      Event: {event.event || 'Unnamed Event'} - 
+      Type: {event.eventType || 'Unnamed Type'} - 
+      <span style={styles.highlight}>
+        {event.eventDate instanceof Date ? event.eventDate.toDateString() : 'N/A'}
+      </span>
+    </p>
+    <p style={styles.eventLocation}>
+      Location: <span style={styles.highlight}>{event.location || 'No location specified'}</span>
+    </p>
+    <p style={styles.eventTime}>
+      Start Time: <span style={styles.highlight}>
+        {event.startTime ? formatTime(event.startTime) : 'N/A'}
+      </span>
+    </p>
+    <p style={styles.eventTime}>
+      End Time: <span style={styles.highlight}>
+        {event.endTime ? formatTime(event.endTime) : 'N/A'}
+      </span>
+    </p>
 
                   <p style={styles.eventContact}>Contact: <span style={styles.highlight}>{event.contactNumber || 'N/A'}</span></p>
                   <p style={styles.eventEmail}>Email: <span style={styles.highlight}>{event.email || 'N/A'}</span></p>
