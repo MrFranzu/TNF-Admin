@@ -318,6 +318,20 @@ const BookingList = () => {
           border: '1px solid #ccc',
         }}
       />
+<div
+  style={{
+    backgroundColor: '#ffeb3b',
+    color: '#000',
+    padding: '10px 20px',
+    borderRadius: '10px',
+    marginBottom: '20px',
+    fontWeight: 'bold',
+    display: bookings.pending.length > 0 ? 'block' : 'none',
+    textAlign: 'center',
+  }}
+>
+  You have {bookings.pending.length} pending bookings.
+</div>
 
       <button
         onClick={downloadExcel}

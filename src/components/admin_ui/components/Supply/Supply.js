@@ -1,232 +1,217 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../../firebaseConfig"; // Firebase config import
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from "firebase/firestore";
-import * as XLSX from "xlsx"; // Import xlsx library
-import { saveAs } from "file-saver"; // Import file-saver for download
+import Calendar from "react-calendar"; // Install via npm install react-calendar
+import "react-calendar/dist/Calendar.css"; // Calendar CSS
+import { db } from "../../firebaseConfig";
+import { collection, getDocs } from "firebase/firestore";
 
-function EventSupplies() {
-  const [supplies, setSupplies] = useState([]);
-  const [newSupply, setNewSupply] = useState("");
-  const [newQuantity, setNewQuantity] = useState("");
-  const [editIndex, setEditIndex] = useState(null);
-  const [editId, setEditId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(""); // New state for search query
+function EventCalendar() {
+  const [bookings, setBookings] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [allocatedSupplies, setAllocatedSupplies] = useState({});
 
-  const suppliesCollectionRef = collection(db, "supplies");
+  const SUPPLIES_PER_ATTENDEE = {
+    chairs: 1,
+    tables: 0.2,
+    plates: 1.2,
+    bowls: 1.1,
+    napkins: 2.1,
+    utensils: 2.5,
+  };
 
   useEffect(() => {
-    const fetchSupplies = async () => {
-      const data = await getDocs(suppliesCollectionRef);
-      setSupplies(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
+    const fetchBookings = async () => {
+      const bookingsCollection = collection(db, "bookings");
+      const bookingsSnapshot = await getDocs(bookingsCollection);
+
+      const fetchedBookings = bookingsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setBookings(fetchedBookings);
+      allocateSupplies(fetchedBookings);
     };
-    fetchSupplies();
+
+    fetchBookings();
   }, []);
 
-  const handleAddSupply = async () => {
-    if (newSupply && newQuantity) {
-      try {
-        await addDoc(suppliesCollectionRef, {
-          name: newSupply,
-          quantity: parseInt(newQuantity, 10),
-        });
-        setNewSupply("");
-        setNewQuantity("");
-        const data = await getDocs(suppliesCollectionRef);
-        setSupplies(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
-      } catch (e) {
-        console.error("Error adding document: ", e);
+  const allocateSupplies = (bookings) => {
+    const allocations = {};
+    bookings.forEach((booking) => {
+      const date = new Date(booking.eventDate.seconds * 1000).toDateString();
+      const numAttendees = booking.numAttendees;
+
+      if (!allocations[date]) {
+        allocations[date] = {};
       }
+
+      Object.keys(SUPPLIES_PER_ATTENDEE).forEach((supply) => {
+        const neededSupply = Math.ceil(
+          numAttendees * SUPPLIES_PER_ATTENDEE[supply]
+        );
+        allocations[date][supply] =
+          (allocations[date][supply] || 0) + neededSupply;
+      });
+    });
+
+    setAllocatedSupplies(allocations);
+  };
+
+  const bookedDates = bookings.map((booking) =>
+    new Date(booking.eventDate.seconds * 1000)
+  );
+
+  const renderSuppliesForDate = (date) => {
+    const dateString = date.toDateString();
+    const suppliesForDate = allocatedSupplies[dateString];
+
+    if (!suppliesForDate) {
+      return <p style={{ color: "#6A1B9A" }}>No bookings for this date.</p>;
     }
-  };
 
-  const handleEditSupply = (index) => {
-    setEditIndex(index);
-    setNewSupply(supplies[index].name);
-    setNewQuantity(supplies[index].quantity);
-    setEditId(supplies[index].id);
-  };
-
-  const handleUpdateSupply = async () => {
-    if (newSupply && newQuantity && editIndex !== null) {
-      try {
-        const supplyDoc = doc(db, "supplies", editId);
-        await updateDoc(supplyDoc, {
-          name: newSupply,
-          quantity: parseInt(newQuantity, 10),
-        });
-        setNewSupply("");
-        setNewQuantity("");
-        setEditIndex(null);
-        setEditId(null);
-        const data = await getDocs(suppliesCollectionRef);
-        setSupplies(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
-      } catch (e) {
-        console.error("Error updating document: ", e);
-      }
-    }
-  };
-
-  const handleDeleteSupply = async (id) => {
-    try {
-      const supplyDoc = doc(db, "supplies", id);
-      await deleteDoc(supplyDoc);
-      const data = await getDocs(suppliesCollectionRef);
-      setSupplies(data.docs.map((doc) => ({ ...doc.data(), id: doc.id })));
-    } catch (e) {
-      console.error("Error deleting document: ", e);
-    }
-  };
-
-  const handleExportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      supplies.map((supply) => ({
-        "Supply Name": supply.name,
-        Quantity: supply.quantity,
-      }))
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Supplies");
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const file = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(file, "supplies_list.xlsx");
-  };
-
-  // Filter supplies based on search query
-  const filteredSupplies = supplies.filter((supply) => {
-    const lowerCaseQuery = searchQuery.toLowerCase();
     return (
-      supply.name.toLowerCase().includes(lowerCaseQuery) ||
-      supply.quantity.toString().includes(lowerCaseQuery)
+      <ul>
+        {Object.keys(suppliesForDate).map((supply) => (
+          <li
+            key={supply}
+            style={{
+              marginBottom: "10px",
+              fontSize: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                width: "20px",
+                height: "20px",
+                backgroundColor: "#BA68C8",
+                borderRadius: "50%",
+              }}
+            ></span>
+            <strong>
+              {supply.charAt(0).toUpperCase() + supply.slice(1)}:
+            </strong>{" "}
+            {suppliesForDate[supply]}
+          </li>
+        ))}
+      </ul>
     );
-  });
-
-  const containerStyle = {
-    backgroundColor: "#EEE6F3",
-    color: "#4A148C",
-    fontFamily: "Arial, sans-serif",
-    padding: "20px",
-    maxWidth: "1200px",
-    margin: "auto",
-    borderRadius: "8px",
-    textAlign: "center",
-  };
-
-  const inputStyle = {
-    margin: "10px",
-    padding: "8px",
-    border: "1px solid #4A148C",
-    borderRadius: "4px",
-    outline: "none",
-  };
-
-  const buttonStyle = {
-    margin: "10px",
-    padding: "10px 20px",
-    backgroundColor: "#4A148C",
-    color: "#FFF",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-  };
-
-  const tableStyle = {
-    width: "100%",
-    borderCollapse: "collapse",
-    margin: "20px 0",
-  };
-
-  const thStyle = {
-    backgroundColor: "#6A1B9A",
-    color: "#FFF",
-    padding: "10px",
-  };
-
-  const tdStyle = {
-    border: "1px solid #DDD",
-    padding: "10px",
-    textAlign: "center",
-  };
-
-  // Scrollable table container style
-  const tableContainerStyle = {
-    maxHeight: "400px", // Adjust based on how tall you want the scrollable area
-    overflowY: "auto",  // Enables vertical scrolling
   };
 
   return (
-    <div style={containerStyle}>
-      <h1>Supply Management</h1>
-      <div>
-        <input
-          type="text"
-          style={inputStyle}
-          value={newSupply}
-          onChange={(e) => setNewSupply(e.target.value)}
-          placeholder="Supply Name"
-        />
-        <input
-          type="number"
-          style={inputStyle}
-          value={newQuantity}
-          onChange={(e) => setNewQuantity(e.target.value)}
-          placeholder="Quantity"
-        />
-        {editIndex !== null ? (
-          <button style={buttonStyle} onClick={handleUpdateSupply}>
-            Update Supply
-          </button>
-        ) : (
-          <button style={buttonStyle} onClick={handleAddSupply}>
-            Add Supply
-          </button>
+    <div
+      style={{
+        padding: "20px",
+        fontFamily: "'Poppins', sans-serif",
+        background: "linear-gradient(120deg, #EDE7F6, #FFF)",
+        minHeight: "100vh",
+      }}
+    >
+      <h1
+        style={{
+          color: "#4A148C",
+          textAlign: "center",
+          fontWeight: "bold",
+          marginBottom: "20px",
+        }}
+      >
+        Supply Allocation
+      </h1>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "20px",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+        }}
+      >
+        {/* Calendar Section */}
+        <div
+          style={{
+            flex: "1 1 400px",
+            maxWidth: "500px",
+            boxShadow: "0 6px 12px rgba(0, 0, 0, 0.1)",
+            borderRadius: "12px",
+            padding: "20px",
+            backgroundColor: "white",
+          }}
+        >
+          <Calendar
+            onChange={setSelectedDate}
+            value={selectedDate}
+            tileClassName={({ date }) =>
+              bookedDates.find(
+                (bookedDate) =>
+                  bookedDate.toDateString() === date.toDateString()
+              )
+                ? "booked"
+                : null
+            }
+          />
+          <style>
+            {`
+            .react-calendar {
+              border: none;
+              border-radius: 12px;
+              overflow: hidden;
+            }
+            .react-calendar__tile {
+              padding: 12px;
+              text-align: center;
+              border-radius: 8px;
+              color: #4A148C;
+              transition: all 0.3s ease;
+            }
+            .react-calendar__tile:hover {
+              background-color: #E1BEE7;
+              transform: scale(1.05);
+            }
+            .react-calendar__tile--active {
+              background-color: #8E24AA !important;
+              color: white !important;
+              border: 2px solid #4A148C;
+            }
+            .booked {
+              background: #BA68C8;
+              color: white;
+              border-radius: 50%;
+            }
+          `}
+          </style>
+        </div>
+
+        {/* Supplies Section */}
+        {selectedDate && (
+          <div
+            style={{
+              flex: "1 1 400px",
+              maxWidth: "500px",
+              padding: "20px",
+              borderRadius: "12px",
+              boxShadow: "0 6px 12px rgba(0, 0, 0, 0.1)",
+              backgroundColor: "#F3E5F5",
+            }}
+          >
+            <h2
+              style={{
+                color: "#4A148C",
+                fontWeight: "600",
+                marginBottom: "10px",
+              }}
+            >
+              Supplies for {selectedDate.toDateString()}
+            </h2>
+            {renderSuppliesForDate(selectedDate)}
+          </div>
         )}
       </div>
-
-      {/* Search Bar */}
-      <div>
-        <input
-          type="text"
-          style={inputStyle}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search Supplies"
-        />
-      </div>
-
-      {/* Scrollable Table */}
-      <div style={tableContainerStyle}>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Supply Name</th>
-              <th style={thStyle}>Quantity</th>
-              <th style={thStyle}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSupplies.map((supply, index) => (
-              <tr key={supply.id}>
-                <td style={tdStyle}>{supply.name}</td>
-                <td style={tdStyle}>{supply.quantity}</td>
-                <td style={tdStyle}>
-                  <button style={buttonStyle} onClick={() => handleEditSupply(index)}>
-                    Edit
-                  </button>
-                  <button style={buttonStyle} onClick={() => handleDeleteSupply(supply.id)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <button style={buttonStyle} onClick={handleExportExcel}>
-        Download Supply
-      </button>
     </div>
   );
 }
 
-export default EventSupplies;
+export default EventCalendar;

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, getDocs, doc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import * as XLSX from "xlsx"; // Import the xlsx library
+import { getDocsFromServer } from "firebase/firestore";
 
 const Attend = () => {
   const [bookings, setBookings] = useState([]);
@@ -31,18 +32,13 @@ const Attend = () => {
 
   // Fetch attendees collection for a selected document
   const fetchAttendees = async (docId) => {
-    try {
-      const docRef = doc(db, "bookings", docId);
-      const attendeesCollection = collection(docRef, "attendees");
-      const attendeesSnapshot = await getDocs(attendeesCollection);
-      const attendeesData = attendeesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAttendees(attendeesData);
-    } catch (error) {
-      console.error("Error fetching attendees:", error);
-    }
+    const attendeesCollection = collection(db, `bookings/${docId}/attendees`);
+    const attendeesSnapshot = await getDocsFromServer(attendeesCollection);
+    const attendeesData = attendeesSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setAttendees(attendeesData);
   };
 
   const handleDocClick = (docId) => {

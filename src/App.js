@@ -9,7 +9,7 @@ import EventCalendar from './components/admin_ui/components/Calendar/Calendar';
 import QrGenerator from './components/admin_ui/components/Supply/Supply';
 import QrScanner from './components/admin_ui/components/QrScanner/QrScanner';
 import EventAnalytics from './components/admin_ui/analytics/EventAnalytics';
-import './App.css';
+
 import Attend from './components/admin_ui/components/Attend/Attend';
 
 const App = () => {
