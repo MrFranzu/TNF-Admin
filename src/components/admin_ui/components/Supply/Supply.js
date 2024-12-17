@@ -108,6 +108,7 @@ function EventCalendar() {
         fontFamily: "'Poppins', sans-serif",
         background: "linear-gradient(120deg, #EDE7F6, #FFF)",
         minHeight: "100vh",
+        boxSizing: "border-box",
       }}
     >
       <h1
@@ -159,9 +160,11 @@ function EventCalendar() {
               border: none;
               border-radius: 12px;
               overflow: hidden;
+              width: 100%;
+              box-sizing: border-box;
             }
             .react-calendar__tile {
-              padding: 12px;
+              padding: 10px;
               text-align: center;
               border-radius: 8px;
               color: #4A148C;
@@ -210,6 +213,18 @@ function EventCalendar() {
           </div>
         )}
       </div>
+      <style>
+        {`
+        @media (max-width: 768px) {
+          h1 {
+            font-size: 24px;
+          }
+          .react-calendar__tile {
+            padding: 8px;
+          }
+        }
+        `}
+      </style>
     </div>
   );
 }
